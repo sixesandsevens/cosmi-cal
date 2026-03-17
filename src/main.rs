@@ -17,8 +17,13 @@ fn main() -> cosmic::iced::Result {
     i18n::init(&requested_languages);
 
     let launch = LaunchPlan::from_args();
-    if !launch.commands.is_empty() && ipc::send_commands(&launch.commands).is_ok() {
-        return Ok(());
+    let startup_commands = launch.startup_commands();
+    match ipc::prepare_startup(&startup_commands) {
+        Ok(ipc::StartupAction::ForwardedToPrimary) => return Ok(()),
+        Ok(ipc::StartupAction::StartPrimary) => {}
+        Err(err) => {
+            eprintln!("IPC startup check failed: {err}");
+        }
     }
 
     if let Some(shell_mode) = launch.shell_mode_env.as_deref() {
@@ -105,5 +110,16 @@ impl LaunchPlan {
         }
 
         plan
+    }
+
+    fn startup_commands(&self) -> Vec<commands::AppCommand> {
+        if self.commands.is_empty() {
+            vec![
+                commands::AppCommand::ShowSurface,
+                commands::AppCommand::FocusTodayNote,
+            ]
+        } else {
+            self.commands.clone()
+        }
     }
 }
