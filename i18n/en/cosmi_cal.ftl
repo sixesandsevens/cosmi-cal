@@ -2,6 +2,7 @@ app-title = Cosmi Cal
 about = About
 repository = Repository
 view = View
+nav-dashboard = Dashboard
 nav-calendar = Calendar
 nav-scratchpad = Scratchpad
 nav-clipboard = Clipboard

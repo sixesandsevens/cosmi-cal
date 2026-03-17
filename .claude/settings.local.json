@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source ~/.cargo/env)",
+      "Read(//home/sixesandsevens/.cargo/git/checkouts/libcosmic-41009aea1d72760b/9602dfd/src/theme/style/**)",
+      "Bash(cargo build:*)"
+    ]
+  }
+}

@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
 
 pub const MAX_CLIPBOARD_HISTORY: usize = 20;
+/// Ignore clipboard entries larger than this many bytes.
+pub const MAX_CLIPBOARD_BYTES: usize = 20_480; // 20 KB
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppData {
@@ -58,19 +60,28 @@ impl AppData {
         }
     }
 
-    /// Adds an item to the front of clipboard history, deduplicating and capping the list.
-    pub fn push_clipboard(&mut self, item: String) {
+    /// Adds an item to clipboard history with deduplication, size, and cap guardrails.
+    pub fn push_clipboard(&mut self, item: String) -> bool {
+        // Ignore oversized entries
+        if item.len() > MAX_CLIPBOARD_BYTES {
+            return false;
+        }
+        // Ignore blank / whitespace-only
         if item.trim().is_empty() {
-            return;
+            return false;
         }
+        // Already at the front — nothing to do
         if self.clipboard_history.front() == Some(&item) {
-            return;
+            return false;
         }
+        // Deduplicate: remove existing occurrence before re-inserting at front
         self.clipboard_history.retain(|s| s != &item);
         self.clipboard_history.push_front(item);
+        // Cap history length
         while self.clipboard_history.len() > MAX_CLIPBOARD_HISTORY {
             self.clipboard_history.pop_back();
         }
+        true
     }
 
     pub fn pin_clipboard(&mut self, item: String) {
@@ -81,6 +92,10 @@ impl AppData {
 
     pub fn unpin_clipboard(&mut self, item: &str) {
         self.pinned_clipboard.retain(|s| s != item);
+    }
+
+    pub fn clear_clipboard_history(&mut self) {
+        self.clipboard_history.clear();
     }
 
     pub fn has_day_note(&self, date: &str) -> bool {

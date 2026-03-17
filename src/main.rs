@@ -5,8 +5,10 @@ mod calendar;
 mod clipboard;
 mod config;
 mod i18n;
+mod message;
 mod model;
 mod storage;
+mod ui;
 
 fn main() -> cosmic::iced::Result {
     // Get the system's preferred languages.
