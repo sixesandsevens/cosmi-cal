@@ -15,8 +15,8 @@ BIN_TARGET="${BIN_DIR}/${APP_NAME}"
 DESKTOP_SOURCE="${REPO_ROOT}/packaging/${APP_ID}.desktop"
 DESKTOP_TARGET="${APP_DIR}/${APP_ID}.desktop"
 ICON_SOURCE="${REPO_ROOT}/resources/icons/hicolor/scalable/apps/icon.svg"
-ICON_PNG_SOURCE="${REPO_ROOT}/resources/icons/hicolor/256x256/apps/icon.png"
-ICON_TARGET="${ICON_DIR}/${APP_ID}.png"
+ICON_PNG_SOURCE="${REPO_ROOT}/resources/icons/hicolor/256x256/apps/${APP_NAME}.png"
+ICON_TARGET="${ICON_DIR}/${APP_NAME}.png"
 
 mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_DIR"
 
