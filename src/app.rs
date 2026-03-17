@@ -30,6 +30,7 @@ pub struct AppModel {
     nav: nav_bar::Model,
     key_binds: HashMap<menu::KeyBind, MenuAction>,
     config: Config,
+    shell_mode: ShellMode,
     pub data: AppData,
     pub cal_year: i32,
     pub cal_month: u32,
@@ -67,9 +68,15 @@ impl cosmic::Application for AppModel {
     }
 
     fn init(
-        core: cosmic::Core,
+        mut core: cosmic::Core,
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
+        let shell_mode = ShellMode::from_env();
+
+        if shell_mode == ShellMode::DashboardOnly {
+            core.window.show_headerbar = false;
+        }
+
         let mut nav = nav_bar::Model::default();
 
         nav.insert()
@@ -128,6 +135,7 @@ impl cosmic::Application for AppModel {
                     Err((_, cfg)) => cfg,
                 })
                 .unwrap_or_default(),
+            shell_mode,
             data,
             cal_year,
             cal_month,
@@ -146,6 +154,9 @@ impl cosmic::Application for AppModel {
     }
 
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
+        if self.shell_mode == ShellMode::DashboardOnly {
+            return vec![];
+        }
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
             menu::root(fl!("view")).apply(Element::from),
             menu::items(
@@ -157,7 +168,10 @@ impl cosmic::Application for AppModel {
     }
 
     fn nav_model(&self) -> Option<&nav_bar::Model> {
-        Some(&self.nav)
+        match self.shell_mode {
+            ShellMode::Full => Some(&self.nav),
+            ShellMode::DashboardOnly => None,
+        }
     }
 
     fn context_drawer(&self) -> Option<context_drawer::ContextDrawer<'_, Self::Message>> {
@@ -174,25 +188,35 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let content: Element<_> = match self.nav.active_data::<Page>() {
-            Some(Page::Dashboard) => ui::dashboard_page::view(
+        let content: Element<_> = if self.shell_mode == ShellMode::DashboardOnly {
+            ui::dashboard_page::view(
                 &self.data,
                 self.cal_year,
                 self.cal_month,
                 &self.day_note_content,
                 self.window_width,
-            ),
-            Some(Page::Calendar) => ui::calendar_page::view(
-                &self.data,
-                self.cal_year,
-                self.cal_month,
-                &self.day_note_content,
-            ),
-            Some(Page::Scratchpad) => {
-                ui::scratchpad_page::view(&self.scratchpad_content, self.dirty, self.save_error)
+            )
+        } else {
+            match self.nav.active_data::<Page>() {
+                Some(Page::Dashboard) => ui::dashboard_page::view(
+                    &self.data,
+                    self.cal_year,
+                    self.cal_month,
+                    &self.day_note_content,
+                    self.window_width,
+                ),
+                Some(Page::Calendar) => ui::calendar_page::view(
+                    &self.data,
+                    self.cal_year,
+                    self.cal_month,
+                    &self.day_note_content,
+                ),
+                Some(Page::Scratchpad) => {
+                    ui::scratchpad_page::view(&self.scratchpad_content, self.dirty, self.save_error)
+                }
+                Some(Page::Clipboard) => ui::clipboard_page::view(&self.data),
+                None => widget::text("No page selected").into(),
             }
-            Some(Page::Clipboard) => ui::clipboard_page::view(&self.data),
-            None => widget::text("No page selected").into(),
         };
 
         widget::container(content)
@@ -455,6 +479,31 @@ impl AppModel {
     fn mark_dirty(&mut self) {
         self.dirty = true;
         self.save_countdown = SAVE_IDLE_TICKS;
+    }
+}
+
+// ── Shell mode ────────────────────────────────────────────────────────────────
+
+/// Controls how much chrome the app shows.
+///
+/// Set `COSMICAL_MODE=dashboard` in the environment to start in dashboard-only
+/// mode — no nav bar, no menu bar, no window decorations.  Useful for desktop
+/// embedding experiments.  Omit the variable (or set any other value) for the
+/// normal full-shell experience.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+pub enum ShellMode {
+    #[default]
+    Full,
+    DashboardOnly,
+}
+
+impl ShellMode {
+    fn from_env() -> Self {
+        if std::env::var("COSMICAL_MODE").as_deref() == Ok("dashboard") {
+            Self::DashboardOnly
+        } else {
+            Self::Full
+        }
     }
 }
 
