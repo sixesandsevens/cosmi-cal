@@ -14,7 +14,10 @@ This installs:
 
 - `~/.local/bin/cosmi-cal`
 - `~/.local/share/applications/io.github.sixesandsevens.cosmical.desktop`
-- `~/.local/share/icons/hicolor/256x256/apps/io.github.sixesandsevens.cosmical.png`
+- `~/.local/share/icons/hicolor/*/apps/cosmi-cal.png`
+- `~/.local/share/icons/hicolor/*/apps/io.github.sixesandsevens.cosmical.png`
+- `~/.local/share/icons/hicolor/scalable/apps/cosmi-cal.svg`
+- `~/.local/share/icons/hicolor/scalable/apps/io.github.sixesandsevens.cosmical.svg`
 
 After installation, launch `CosmiCal` from your app launcher or run:
 

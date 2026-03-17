@@ -10,6 +10,7 @@ REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 BIN_DIR="${HOME}/.local/bin"
 APP_DIR="${HOME}/.local/share/applications"
 ICON_THEME_ROOT="${HOME}/.local/share/icons/hicolor"
+ICON_NAMES="${APP_NAME} ${APP_ID}"
 
 BIN_SOURCE="${REPO_ROOT}/target/release/${APP_NAME}"
 BIN_TARGET="${BIN_DIR}/${APP_NAME}"
@@ -35,12 +36,14 @@ ICON_INSTALLED=0
 for size in $ICON_SIZES; do
     ICON_PNG_SOURCE="${REPO_ROOT}/resources/icons/hicolor/${size}/apps/${APP_NAME}.png"
     ICON_DIR="${ICON_THEME_ROOT}/${size}/apps"
-    SIZE_ICON_TARGET="${ICON_DIR}/${APP_NAME}.png"
 
     if [ -f "$ICON_PNG_SOURCE" ]; then
         mkdir -p "$ICON_DIR"
-        printf '%s\n' "Installing ${size} icon to ${SIZE_ICON_TARGET}..."
-        install -m 0644 "$ICON_PNG_SOURCE" "$SIZE_ICON_TARGET"
+        for icon_name in $ICON_NAMES; do
+            SIZE_ICON_TARGET="${ICON_DIR}/${icon_name}.png"
+            printf '%s\n' "Installing ${size} icon to ${SIZE_ICON_TARGET}..."
+            install -m 0644 "$ICON_PNG_SOURCE" "$SIZE_ICON_TARGET"
+        done
         ICON_INSTALLED=1
     fi
 done
@@ -50,18 +53,23 @@ if [ ! -f "$SCALABLE_ICON_SOURCE" ] && [ -f "$ICON_SOURCE" ]; then
     SCALABLE_ICON_SOURCE="$ICON_SOURCE"
 fi
 
-if [ -f "$SCALABLE_ICON_SOURCE" ]; then
+if [ -f "$SCALABLE_ICON_SOURCE" ] && grep -Eq '<(path|rect|circle|ellipse|polygon|polyline|line|image|g|defs|use)\b' "$SCALABLE_ICON_SOURCE"; then
     SCALABLE_ICON_DIR="${ICON_THEME_ROOT}/scalable/apps"
-    SCALABLE_ICON_TARGET="${SCALABLE_ICON_DIR}/${APP_NAME}.svg"
     mkdir -p "$SCALABLE_ICON_DIR"
-    printf '%s\n' "Installing scalable icon to ${SCALABLE_ICON_TARGET}..."
-    install -m 0644 "$SCALABLE_ICON_SOURCE" "$SCALABLE_ICON_TARGET"
+    for icon_name in $ICON_NAMES; do
+        SCALABLE_ICON_TARGET="${SCALABLE_ICON_DIR}/${icon_name}.svg"
+        printf '%s\n' "Installing scalable icon to ${SCALABLE_ICON_TARGET}..."
+        install -m 0644 "$SCALABLE_ICON_SOURCE" "$SCALABLE_ICON_TARGET"
+    done
     ICON_INSTALLED=1
 elif [ "$ICON_INSTALLED" -eq 0 ] && command -v rsvg-convert >/dev/null 2>&1; then
     ICON_DIR="${ICON_THEME_ROOT}/256x256/apps"
     mkdir -p "$ICON_DIR"
-    printf '%s\n' "Rendering icon to ${ICON_TARGET}..."
-    rsvg-convert -w 256 -h 256 "$ICON_SOURCE" -o "$ICON_TARGET"
+    for icon_name in $ICON_NAMES; do
+        RENDERED_ICON_TARGET="${ICON_DIR}/${icon_name}.png"
+        printf '%s\n' "Rendering icon to ${RENDERED_ICON_TARGET}..."
+        rsvg-convert -w 256 -h 256 "$ICON_SOURCE" -o "$RENDERED_ICON_TARGET"
+    done
     ICON_INSTALLED=1
 fi
 
