@@ -167,7 +167,7 @@ mod tests {
         let path = unique_test_socket_path("live");
         let _listener = StdUnixListener::bind(&path).expect("bind live socket");
 
-        let action = prepare_startup_at_path(&path, &[AppCommand::ShowSurface])
+        let action = prepare_startup_at_path(&path, &[AppCommand::SummonToggle])
             .expect("forward to existing instance");
 
         assert!(matches!(action, StartupAction::ForwardedToPrimary));
@@ -183,9 +183,12 @@ mod tests {
             let listener = StdUnixListener::bind(&path).expect("bind stale socket");
             drop(listener);
         }
-        assert!(path.exists(), "stale socket file should remain before recovery");
+        assert!(
+            path.exists(),
+            "stale socket file should remain before recovery"
+        );
 
-        let action = prepare_startup_at_path(&path, &[AppCommand::ShowSurface])
+        let action = prepare_startup_at_path(&path, &[AppCommand::SummonToggle])
             .expect("recover from stale socket");
 
         assert!(matches!(action, StartupAction::StartPrimary));

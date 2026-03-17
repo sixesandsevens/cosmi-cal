@@ -94,8 +94,7 @@ impl LaunchPlan {
             match arg.as_str() {
                 "--summon" => {
                     plan.shell_mode_env = Some("surface".to_string());
-                    plan.commands.push(commands::AppCommand::ShowSurface);
-                    plan.commands.push(commands::AppCommand::FocusTodayNote);
+                    plan.commands.push(commands::AppCommand::SummonToggle);
                 }
                 "--focus-today" => {
                     plan.shell_mode_env = Some("surface".to_string());

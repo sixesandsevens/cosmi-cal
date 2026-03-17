@@ -2,6 +2,7 @@
 
 use crate::commands::AppCommand;
 use crate::config::Config;
+use cosmic::iced::Event;
 use cosmic::widget::text_editor;
 
 #[derive(Debug, Clone)]
@@ -30,6 +31,7 @@ pub enum Message {
     PinClipboard(String),
     UnpinClipboard(String),
     ClearClipboardHistory,
+    Event(Event),
     AppCommand(AppCommand),
 
     // Persistence

@@ -12,7 +12,7 @@ use crate::ui;
 use chrono::Datelike;
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
-use cosmic::iced::{Subscription, clipboard as iced_clipboard};
+use cosmic::iced::{Event, Subscription, clipboard as iced_clipboard, event, keyboard, window};
 use cosmic::widget::segmented_button;
 use cosmic::widget::{self, about::About, icon, menu, nav_bar, text_editor};
 use cosmic::{iced_futures, prelude::*};
@@ -278,6 +278,8 @@ impl cosmic::Application for AppModel {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
+        let keyboard_events = event::listen().map(Message::Event);
+
         let config_watch = self
             .core()
             .watch_config::<Config>(Self::APP_ID)
@@ -328,6 +330,7 @@ impl cosmic::Application for AppModel {
         let ipc_commands = ipc::subscription().map(Message::AppCommand);
 
         Subscription::batch(vec![
+            keyboard_events,
             config_watch,
             clipboard_poll,
             save_tick,
@@ -426,6 +429,15 @@ impl cosmic::Application for AppModel {
                 self.mark_dirty();
             }
 
+            Message::Event(Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(keyboard::key::Named::Escape),
+                ..
+            })) => {
+                return self.handle_app_command(AppCommand::DismissSurface);
+            }
+
+            Message::Event(_) => {}
+
             Message::AppCommand(command) => {
                 return self.handle_app_command(command);
             }
@@ -509,6 +521,16 @@ impl AppModel {
 
     fn handle_app_command(&mut self, command: AppCommand) -> Task<cosmic::Action<Message>> {
         match command {
+            AppCommand::SummonToggle => {
+                if self.main_window_is_focused() {
+                    self.dismiss_surface()
+                } else {
+                    Task::batch(vec![
+                        self.handle_app_command(AppCommand::ShowSurface),
+                        self.handle_app_command(AppCommand::FocusTodayNote),
+                    ])
+                }
+            }
             AppCommand::ShowSurface => {
                 if !self.shell_mode.is_dashboard() {
                     self.nav.activate(self.page_ids.dashboard);
@@ -516,6 +538,7 @@ impl AppModel {
 
                 Task::batch(vec![self.focus_main_window(), self.update_title()])
             }
+            AppCommand::DismissSurface => self.dismiss_surface(),
             AppCommand::FocusTodayNote => {
                 if !self.shell_mode.is_dashboard() {
                     self.nav.activate(self.page_ids.dashboard);
@@ -544,6 +567,28 @@ impl AppModel {
                 ])
             }
         }
+    }
+
+    fn dismiss_surface(&mut self) -> Task<cosmic::Action<Message>> {
+        if self.dirty {
+            if self.data.save() {
+                self.dirty = false;
+                self.save_error = false;
+            } else {
+                self.save_error = true;
+            }
+            self.save_countdown = 0;
+        }
+
+        let Some(id) = self.core.main_window_id() else {
+            return Task::none();
+        };
+
+        window::close(id)
+    }
+
+    fn main_window_is_focused(&self) -> bool {
+        self.core.focused_window() == self.core.main_window_id()
     }
 
     fn focus_main_window(&self) -> Task<cosmic::Action<Message>> {

@@ -45,7 +45,9 @@ cosmi-cal --summon
 Behavior:
 
 - if CosmiCal is not running, it launches in surface mode
-- if it is already running, the existing window is focused and the today note is targeted
+- if it is already running and unfocused, the existing window is presented and the today note is targeted
+- if it is already running and focused, the summon toggles it off by closing the surface
+- pressing `Esc` while the surface is focused dismisses it the same way
 
 ## Development
 
