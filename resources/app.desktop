@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Cosmi Cal
+Comment=A minimal calendar, notes, and clipboard utility for the COSMIC desktop
+Type=Application
+Icon=io.github.sixesandsevens.cosmical
+Exec=cosmi-cal %F
+Terminal=false
+StartupNotify=true
+Categories=COSMIC
+Keywords=COSMIC
+MimeType=
