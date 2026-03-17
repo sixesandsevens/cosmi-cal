@@ -9,17 +9,17 @@ REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 
 BIN_DIR="${HOME}/.local/bin"
 APP_DIR="${HOME}/.local/share/applications"
-ICON_DIR="${HOME}/.local/share/icons/hicolor/256x256/apps"
+ICON_THEME_ROOT="${HOME}/.local/share/icons/hicolor"
 
 BIN_SOURCE="${REPO_ROOT}/target/release/${APP_NAME}"
 BIN_TARGET="${BIN_DIR}/${APP_NAME}"
 DESKTOP_SOURCE="${REPO_ROOT}/packaging/${APP_ID}.desktop"
 DESKTOP_TARGET="${APP_DIR}/${APP_ID}.desktop"
 ICON_SOURCE="${REPO_ROOT}/resources/icons/hicolor/scalable/apps/icon.svg"
-ICON_PNG_SOURCE="${REPO_ROOT}/resources/icons/hicolor/256x256/apps/${APP_NAME}.png"
-ICON_TARGET="${ICON_DIR}/${APP_NAME}.png"
+ICON_TARGET="${ICON_THEME_ROOT}/256x256/apps/${APP_NAME}.png"
+ICON_SIZES="32x32 48x48 64x64 128x128 256x256 512x512"
 
-mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_DIR"
+mkdir -p "$BIN_DIR" "$APP_DIR"
 
 printf '%s\n' "Building CosmiCal..."
 cargo build --manifest-path "${REPO_ROOT}/Cargo.toml" --release
@@ -30,14 +30,43 @@ install -m 0755 "$BIN_SOURCE" "$BIN_TARGET"
 printf '%s\n' "Installing desktop entry to ${DESKTOP_TARGET}..."
 install -m 0644 "$DESKTOP_SOURCE" "$DESKTOP_TARGET"
 
-if [ -f "$ICON_PNG_SOURCE" ]; then
-    printf '%s\n' "Installing packaged icon to ${ICON_TARGET}..."
-    install -m 0644 "$ICON_PNG_SOURCE" "$ICON_TARGET"
-elif command -v rsvg-convert >/dev/null 2>&1; then
+ICON_INSTALLED=0
+
+for size in $ICON_SIZES; do
+    ICON_PNG_SOURCE="${REPO_ROOT}/resources/icons/hicolor/${size}/apps/${APP_NAME}.png"
+    ICON_DIR="${ICON_THEME_ROOT}/${size}/apps"
+    SIZE_ICON_TARGET="${ICON_DIR}/${APP_NAME}.png"
+
+    if [ -f "$ICON_PNG_SOURCE" ]; then
+        mkdir -p "$ICON_DIR"
+        printf '%s\n' "Installing ${size} icon to ${SIZE_ICON_TARGET}..."
+        install -m 0644 "$ICON_PNG_SOURCE" "$SIZE_ICON_TARGET"
+        ICON_INSTALLED=1
+    fi
+done
+
+SCALABLE_ICON_SOURCE="${REPO_ROOT}/resources/icons/hicolor/scalable/apps/${APP_NAME}.svg"
+if [ ! -f "$SCALABLE_ICON_SOURCE" ] && [ -f "$ICON_SOURCE" ]; then
+    SCALABLE_ICON_SOURCE="$ICON_SOURCE"
+fi
+
+if [ -f "$SCALABLE_ICON_SOURCE" ]; then
+    SCALABLE_ICON_DIR="${ICON_THEME_ROOT}/scalable/apps"
+    SCALABLE_ICON_TARGET="${SCALABLE_ICON_DIR}/${APP_NAME}.svg"
+    mkdir -p "$SCALABLE_ICON_DIR"
+    printf '%s\n' "Installing scalable icon to ${SCALABLE_ICON_TARGET}..."
+    install -m 0644 "$SCALABLE_ICON_SOURCE" "$SCALABLE_ICON_TARGET"
+    ICON_INSTALLED=1
+elif [ "$ICON_INSTALLED" -eq 0 ] && command -v rsvg-convert >/dev/null 2>&1; then
+    ICON_DIR="${ICON_THEME_ROOT}/256x256/apps"
+    mkdir -p "$ICON_DIR"
     printf '%s\n' "Rendering icon to ${ICON_TARGET}..."
     rsvg-convert -w 256 -h 256 "$ICON_SOURCE" -o "$ICON_TARGET"
-else
-    printf '%s\n' "No packaged PNG icon and rsvg-convert not found; the launcher may appear without an icon until one is installed." >&2
+    ICON_INSTALLED=1
+fi
+
+if [ "$ICON_INSTALLED" -eq 0 ]; then
+    printf '%s\n' "No packaged icons were found and rsvg-convert is unavailable; the launcher may appear without an icon until one is installed." >&2
 fi
 
 if command -v update-desktop-database >/dev/null 2>&1; then
