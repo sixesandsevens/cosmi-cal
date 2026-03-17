@@ -4,8 +4,7 @@ use crate::calendar;
 use crate::message::Message;
 use crate::model::AppData;
 use crate::ui::calendar_grid;
-use cosmic::iced::alignment::Horizontal;
-use cosmic::iced::{Alignment, Length};
+use cosmic::iced::Length;
 use cosmic::widget::{self, text_editor};
 
 pub fn view<'a>(
@@ -21,16 +20,7 @@ pub fn view<'a>(
     let month_label = format!("{} {}", calendar::month_name(cal_month), cal_year);
 
     // ── Month navigation ──────────────────────────────────────────────────────
-    let nav = widget::row::with_capacity(3)
-        .push(widget::button::standard("‹").on_press(Message::PrevMonth))
-        .push(
-            widget::text::title4(month_label)
-                .width(Length::Fill)
-                .align_x(Horizontal::Center),
-        )
-        .push(widget::button::standard("›").on_press(Message::NextMonth))
-        .align_y(Alignment::Center)
-        .spacing(space_s);
+    let nav = calendar_grid::nav_row_title(month_label, space_s);
 
     const CELL: f32 = 36.0;
 

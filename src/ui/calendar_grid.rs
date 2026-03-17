@@ -12,12 +12,29 @@ use cosmic::iced::alignment::Horizontal;
 use cosmic::iced::{Alignment, Length};
 use cosmic::widget;
 
-/// Renders a month navigation row (‹ label ›).
+/// Renders a compact month navigation row (‹ body-text label ›).
+/// Used by the mini calendar on the dashboard.
 pub fn nav_row<'a>(month_label: String, space: u16) -> cosmic::Element<'a, Message> {
     widget::row::with_capacity(3)
         .push(widget::button::standard("‹").on_press(Message::PrevMonth))
         .push(
             widget::text::body(month_label)
+                .width(Length::Fill)
+                .align_x(Horizontal::Center),
+        )
+        .push(widget::button::standard("›").on_press(Message::NextMonth))
+        .align_y(Alignment::Center)
+        .spacing(space)
+        .into()
+}
+
+/// Renders a full-size month navigation row (‹ title4 label ›).
+/// Used by the main calendar page.
+pub fn nav_row_title<'a>(month_label: String, space: u16) -> cosmic::Element<'a, Message> {
+    widget::row::with_capacity(3)
+        .push(widget::button::standard("‹").on_press(Message::PrevMonth))
+        .push(
+            widget::text::title4(month_label)
                 .width(Length::Fill)
                 .align_x(Horizontal::Center),
         )

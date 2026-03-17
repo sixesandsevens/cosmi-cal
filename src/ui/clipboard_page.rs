@@ -18,10 +18,11 @@ pub fn view<'a>(data: &'a AppData) -> cosmic::Element<'a, Message> {
         widget::column::with_capacity(data.pinned_clipboard.len() + 1).spacing(space_xs);
 
     if !data.pinned_clipboard.is_empty() {
-        pinned_col = pinned_col.push(widget::text::title4("Pinned"));
+        pinned_col = pinned_col.push(widget::text::title4("Pinned — always here"));
         for item in &data.pinned_clipboard {
             pinned_col = pinned_col.push(clipboard_row(item, true, space_xs));
         }
+        pinned_col = pinned_col.push(widget::divider::horizontal::default());
     }
 
     // ── Recent ────────────────────────────────────────────────────────────────
@@ -47,10 +48,9 @@ pub fn view<'a>(data: &'a AppData) -> cosmic::Element<'a, Message> {
         }
     }
 
-    widget::column::with_capacity(4)
+    widget::column::with_capacity(3)
         .push(header)
         .push(pinned_col)
-        .push(widget::divider::horizontal::default())
         .push(history_col)
         .spacing(space_s)
         .padding(space_s)

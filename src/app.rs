@@ -386,6 +386,15 @@ impl cosmic::Application for AppModel {
         self.nav.activate(id);
         self.update_title()
     }
+
+    fn on_app_exit(&mut self) -> Option<Self::Message> {
+        // Flush any pending changes synchronously before the process exits.
+        if self.dirty {
+            self.data.save();
+            self.dirty = false;
+        }
+        None
+    }
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
