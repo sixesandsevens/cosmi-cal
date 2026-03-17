@@ -31,17 +31,13 @@ pub fn view<'a>(data: &'a AppData) -> cosmic::Element<'a, Message> {
 
     let recent_header = widget::row::with_capacity(2)
         .push(widget::text::title4("Recent").width(Length::Fill))
-        .push(
-            widget::button::text("Clear")
-                .on_press(Message::ClearClipboardHistory),
-        )
+        .push(widget::button::text("Clear").on_press(Message::ClearClipboardHistory))
         .align_y(Alignment::Center);
 
     history_col = history_col.push(recent_header);
 
     if data.clipboard_history.is_empty() {
-        history_col =
-            history_col.push(widget::text("No clipboard history yet. Copy something!"));
+        history_col = history_col.push(widget::text("No clipboard history yet. Copy something!"));
     } else {
         for item in &data.clipboard_history {
             history_col = history_col.push(clipboard_row(item, false, space_xs));
@@ -70,10 +66,7 @@ fn clipboard_row(item: &str, pinned: bool, space_xs: u16) -> cosmic::Element<'_,
 
     widget::row::with_capacity(3)
         .push(widget::text(preview).width(Length::Fill))
-        .push(
-            widget::button::text("Restore")
-                .on_press(Message::RestoreClipboard(owned)),
-        )
+        .push(widget::button::text("Restore").on_press(Message::RestoreClipboard(owned)))
         .push(action_btn)
         .align_y(cosmic::iced::Alignment::Center)
         .spacing(space_xs)

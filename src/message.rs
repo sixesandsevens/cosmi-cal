@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::commands::AppCommand;
 use crate::config::Config;
 use cosmic::widget::text_editor;
 
@@ -29,6 +30,7 @@ pub enum Message {
     PinClipboard(String),
     UnpinClipboard(String),
     ClearClipboardHistory,
+    AppCommand(AppCommand),
 
     // Persistence
     SaveTick,

@@ -12,6 +12,7 @@ pub fn view<'a>(
     cal_year: i32,
     cal_month: u32,
     note_content: &'a text_editor::Content,
+    day_note_editor_id: widget::Id,
 ) -> cosmic::Element<'a, Message> {
     let spacing = cosmic::theme::spacing();
     let space_s = spacing.space_s;
@@ -39,6 +40,7 @@ pub fn view<'a>(
     let note_header = widget::text::title4(note_label);
 
     let note_editor = text_editor(note_content)
+        .id(day_note_editor_id)
         .placeholder("No note for this day yet. Select a day and start typing.")
         .on_action(Message::DayNoteAction)
         .height(Length::Fixed(160.0));
@@ -46,7 +48,9 @@ pub fn view<'a>(
     widget::column::with_capacity(7)
         .push(nav)
         .push(calendar_grid::dow_row(CELL, space_xs))
-        .push(calendar_grid::day_grid(data, cal_year, cal_month, CELL, space_xs))
+        .push(calendar_grid::day_grid(
+            data, cal_year, cal_month, CELL, space_xs,
+        ))
         .push(
             widget::row::with_capacity(1)
                 .push(widget::Space::new().width(Length::Fill))

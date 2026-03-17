@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::calendar;
+use crate::commands::AppCommand;
 use crate::config::Config;
 use crate::fl;
+use crate::focus::FocusTarget;
+use crate::ipc;
 use crate::message::Message;
 use crate::model::AppData;
 use crate::ui;
 use chrono::Datelike;
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
-use cosmic::iced::{clipboard as iced_clipboard, Subscription};
+use cosmic::iced::{Subscription, clipboard as iced_clipboard};
+use cosmic::widget::segmented_button;
 use cosmic::widget::{self, about::About, icon, menu, nav_bar, text_editor};
 use cosmic::{iced_futures, prelude::*};
 use futures_util::SinkExt;
@@ -31,6 +35,7 @@ pub struct AppModel {
     key_binds: HashMap<menu::KeyBind, MenuAction>,
     config: Config,
     shell_mode: ShellMode,
+    page_ids: PageIds,
     pub data: AppData,
     pub cal_year: i32,
     pub cal_month: u32,
@@ -50,11 +55,31 @@ pub struct AppModel {
     pub scratchpad_content: text_editor::Content,
     /// Multiline editor state for the calendar selected-day note.
     pub day_note_content: text_editor::Content,
+    pub day_note_editor_id: widget::Id,
+    pub scratchpad_editor_id: widget::Id,
+    pending_focus: FocusTarget,
+}
+
+#[derive(Clone, Default)]
+pub struct LaunchFlags {
+    startup_commands: Vec<AppCommand>,
+}
+
+impl LaunchFlags {
+    pub fn new(startup_commands: Vec<AppCommand>) -> Self {
+        Self { startup_commands }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct PageIds {
+    dashboard: segmented_button::Entity,
+    scratchpad: segmented_button::Entity,
 }
 
 impl cosmic::Application for AppModel {
     type Executor = cosmic::executor::Default;
-    type Flags = ();
+    type Flags = LaunchFlags;
     type Message = Message;
 
     const APP_ID: &'static str = "io.github.sixesandsevens.cosmical";
@@ -69,31 +94,41 @@ impl cosmic::Application for AppModel {
 
     fn init(
         mut core: cosmic::Core,
-        _flags: Self::Flags,
+        flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         let shell_mode = ShellMode::from_env();
 
-        if shell_mode == ShellMode::DashboardOnly {
+        if shell_mode.is_dashboard() {
             core.window.show_headerbar = false;
+        }
+        if shell_mode == ShellMode::Surface {
+            core.window.show_close = false;
+            core.window.show_maximize = false;
+            core.window.show_minimize = false;
+            core.window.show_window_menu = false;
         }
 
         let mut nav = nav_bar::Model::default();
 
-        nav.insert()
+        let dashboard = nav
+            .insert()
             .text(fl!("nav-dashboard"))
             .data::<Page>(Page::Dashboard)
             .icon(icon::from_name("view-grid-symbolic"))
-            .activate();
+            .activate()
+            .id();
 
         nav.insert()
             .text(fl!("nav-calendar"))
             .data::<Page>(Page::Calendar)
             .icon(icon::from_name("x-office-calendar-symbolic"));
 
-        nav.insert()
+        let scratchpad = nav
+            .insert()
             .text(fl!("nav-scratchpad"))
             .data::<Page>(Page::Scratchpad)
-            .icon(icon::from_name("document-edit-symbolic"));
+            .icon(icon::from_name("document-edit-symbolic"))
+            .id();
 
         nav.insert()
             .text(fl!("nav-clipboard"))
@@ -136,6 +171,10 @@ impl cosmic::Application for AppModel {
                 })
                 .unwrap_or_default(),
             shell_mode,
+            page_ids: PageIds {
+                dashboard,
+                scratchpad,
+            },
             data,
             cal_year,
             cal_month,
@@ -147,14 +186,21 @@ impl cosmic::Application for AppModel {
             window_width: 800.0,
             scratchpad_content,
             day_note_content,
+            day_note_editor_id: widget::Id::unique(),
+            scratchpad_editor_id: widget::Id::unique(),
+            pending_focus: FocusTarget::None,
         };
 
-        let command = app.update_title();
+        let mut commands = vec![app.update_title()];
+        for command in flags.startup_commands {
+            commands.push(app.handle_app_command(command));
+        }
+        let command = Task::batch(commands);
         (app, command)
     }
 
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
-        if self.shell_mode == ShellMode::DashboardOnly {
+        if self.shell_mode.is_dashboard() {
             return vec![];
         }
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
@@ -170,7 +216,7 @@ impl cosmic::Application for AppModel {
     fn nav_model(&self) -> Option<&nav_bar::Model> {
         match self.shell_mode {
             ShellMode::Full => Some(&self.nav),
-            ShellMode::DashboardOnly => None,
+            ShellMode::DashboardOnly | ShellMode::Surface => None,
         }
     }
 
@@ -188,13 +234,14 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let content: Element<_> = if self.shell_mode == ShellMode::DashboardOnly {
+        let content: Element<_> = if self.shell_mode.is_dashboard() {
             ui::dashboard_page::view(
                 &self.data,
                 self.cal_year,
                 self.cal_month,
                 &self.day_note_content,
                 self.window_width,
+                self.day_note_editor_id.clone(),
             )
         } else {
             match self.nav.active_data::<Page>() {
@@ -204,16 +251,21 @@ impl cosmic::Application for AppModel {
                     self.cal_month,
                     &self.day_note_content,
                     self.window_width,
+                    self.day_note_editor_id.clone(),
                 ),
                 Some(Page::Calendar) => ui::calendar_page::view(
                     &self.data,
                     self.cal_year,
                     self.cal_month,
                     &self.day_note_content,
+                    self.day_note_editor_id.clone(),
                 ),
-                Some(Page::Scratchpad) => {
-                    ui::scratchpad_page::view(&self.scratchpad_content, self.dirty, self.save_error)
-                }
+                Some(Page::Scratchpad) => ui::scratchpad_page::view(
+                    &self.scratchpad_content,
+                    self.scratchpad_editor_id.clone(),
+                    self.dirty,
+                    self.save_error,
+                ),
                 Some(Page::Clipboard) => ui::clipboard_page::view(&self.data),
                 None => widget::text("No page selected").into(),
             }
@@ -273,7 +325,15 @@ impl cosmic::Application for AppModel {
             )
         });
 
-        Subscription::batch(vec![config_watch, clipboard_poll, save_tick, rollover_tick])
+        let ipc_commands = ipc::subscription().map(Message::AppCommand);
+
+        Subscription::batch(vec![
+            config_watch,
+            clipboard_poll,
+            save_tick,
+            rollover_tick,
+            ipc_commands,
+        ])
     }
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
@@ -308,38 +368,11 @@ impl cosmic::Application for AppModel {
             }
 
             Message::GoToToday => {
-                let today = calendar::today_string();
-                if let Some((y, m)) = parse_ym(&today) {
-                    self.cal_year = y;
-                    self.cal_month = m;
-                }
-                self.data.selected_date = today.clone();
-                // Re-initialize day note editor for the newly selected date.
-                let text = self
-                    .data
-                    .day_notes
-                    .get(&today)
-                    .map(String::as_str)
-                    .unwrap_or("");
-                self.day_note_content = text_editor::Content::with_text(text);
-                self.mark_dirty();
+                self.select_date_internal(calendar::today_string(), true);
             }
 
             Message::SelectDate(date) => {
-                if let Some((y, m)) = parse_ym(&date) {
-                    self.cal_year = y;
-                    self.cal_month = m;
-                }
-                // Re-initialize day note editor for the newly selected date.
-                let text = self
-                    .data
-                    .day_notes
-                    .get(&date)
-                    .map(String::as_str)
-                    .unwrap_or("");
-                self.day_note_content = text_editor::Content::with_text(text);
-                self.data.selected_date = date;
-                self.mark_dirty();
+                self.select_date_internal(date, true);
             }
 
             Message::ScratchpadAction(action) => {
@@ -393,6 +426,10 @@ impl cosmic::Application for AppModel {
                 self.mark_dirty();
             }
 
+            Message::AppCommand(command) => {
+                return self.handle_app_command(command);
+            }
+
             Message::SaveTick => {
                 if self.dirty && self.save_countdown > 0 {
                     self.save_countdown -= 1;
@@ -414,18 +451,7 @@ impl cosmic::Application for AppModel {
                 if today != self.last_seen_date {
                     self.last_seen_date = today.clone();
                     // Snap the selected date to the new day and refresh the editor.
-                    if let Some((y, m)) = parse_ym(&today) {
-                        self.cal_year = y;
-                        self.cal_month = m;
-                    }
-                    let text = self
-                        .data
-                        .day_notes
-                        .get(&today)
-                        .map(String::as_str)
-                        .unwrap_or("");
-                    self.day_note_content = text_editor::Content::with_text(text);
-                    self.data.selected_date = today;
+                    self.select_date_internal(today, false);
                 }
             }
         }
@@ -480,30 +506,130 @@ impl AppModel {
         self.dirty = true;
         self.save_countdown = SAVE_IDLE_TICKS;
     }
+
+    fn handle_app_command(&mut self, command: AppCommand) -> Task<cosmic::Action<Message>> {
+        match command {
+            AppCommand::ShowSurface => {
+                if !self.shell_mode.is_dashboard() {
+                    self.nav.activate(self.page_ids.dashboard);
+                }
+
+                Task::batch(vec![self.focus_main_window(), self.update_title()])
+            }
+            AppCommand::FocusTodayNote => {
+                if !self.shell_mode.is_dashboard() {
+                    self.nav.activate(self.page_ids.dashboard);
+                }
+
+                self.select_date_internal(calendar::today_string(), true);
+                self.pending_focus = FocusTarget::TodayNote;
+
+                Task::batch(vec![
+                    self.focus_main_window(),
+                    self.focus_pending_target(),
+                    self.update_title(),
+                ])
+            }
+            AppCommand::FocusScratchpad => {
+                if !self.shell_mode.is_dashboard() {
+                    self.nav.activate(self.page_ids.scratchpad);
+                }
+
+                self.pending_focus = FocusTarget::Scratchpad;
+
+                Task::batch(vec![
+                    self.focus_main_window(),
+                    self.focus_pending_target(),
+                    self.update_title(),
+                ])
+            }
+        }
+    }
+
+    fn focus_main_window(&self) -> Task<cosmic::Action<Message>> {
+        let Some(id) = self.core.main_window_id() else {
+            return Task::none();
+        };
+
+        cosmic::iced_runtime::window::minimize(id, false)
+            .chain(cosmic::iced_runtime::window::gain_focus(id))
+    }
+
+    fn focus_pending_target(&mut self) -> Task<cosmic::Action<Message>> {
+        let target = self.pending_focus;
+        self.pending_focus = FocusTarget::None;
+
+        match target {
+            FocusTarget::TodayNote => {
+                cosmic::iced_runtime::widget::operation::focus(self.day_note_editor_id.clone())
+            }
+            FocusTarget::Scratchpad => {
+                cosmic::iced_runtime::widget::operation::focus(self.scratchpad_editor_id.clone())
+            }
+            FocusTarget::None => Task::none(),
+        }
+    }
+
+    fn select_date_internal(&mut self, date: String, persist_selection: bool) {
+        if let Some((y, m)) = parse_ym(&date) {
+            self.cal_year = y;
+            self.cal_month = m;
+        }
+
+        let text = self
+            .data
+            .day_notes
+            .get(&date)
+            .map(String::as_str)
+            .unwrap_or("");
+        self.day_note_content = text_editor::Content::with_text(text);
+        self.data.selected_date = date;
+
+        if persist_selection {
+            self.mark_dirty();
+        }
+    }
 }
 
 // ── Shell mode ────────────────────────────────────────────────────────────────
 
 /// Controls how much chrome the app shows.
 ///
-/// Set `COSMICAL_MODE=dashboard` in the environment to start in dashboard-only
-/// mode — no nav bar, no menu bar, no window decorations.  Useful for desktop
-/// embedding experiments.  Omit the variable (or set any other value) for the
-/// normal full-shell experience.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+/// Set `COSMICAL_MODE` in the environment before launching:
+///   (unset)   — surface mode, optimized for everyday always-open use
+///   full      — normal full-shell app with nav bar and titlebar
+///   dashboard — nav bar hidden, no menu bar, no titlebar; dashboard always shown
+///   surface   — everything above, plus all window controls stripped; intended
+///               for desktop-embedding experiments
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ShellMode {
-    #[default]
     Full,
+    /// Dashboard always visible, nav/menu bar hidden.
     DashboardOnly,
+    /// Like DashboardOnly but with the strongest possible chrome removal —
+    /// all window controls off, sharp corners, no window menu.
+    /// Use this as the base for desktop-embedding experiments.
+    Surface,
+}
+
+impl Default for ShellMode {
+    fn default() -> Self {
+        Self::Surface
+    }
 }
 
 impl ShellMode {
     fn from_env() -> Self {
-        if std::env::var("COSMICAL_MODE").as_deref() == Ok("dashboard") {
-            Self::DashboardOnly
-        } else {
-            Self::Full
+        match std::env::var("COSMICAL_MODE").as_deref() {
+            Ok("full") => Self::Full,
+            Ok("dashboard") => Self::DashboardOnly,
+            Ok("surface") => Self::Surface,
+            _ => Self::Surface,
         }
+    }
+
+    fn is_dashboard(&self) -> bool {
+        matches!(self, Self::DashboardOnly | Self::Surface)
     }
 }
 
