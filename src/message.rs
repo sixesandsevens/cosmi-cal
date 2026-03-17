@@ -16,10 +16,8 @@ pub enum Message {
     SelectDate(String),
     GoToToday,
 
-    // Day note (calendar page editor)
+    // Day note (calendar page and dashboard editor)
     DayNoteAction(text_editor::Action),
-    // Day note (dashboard today editor)
-    TodayNoteAction(text_editor::Action),
 
     // Scratchpad
     ScratchpadAction(text_editor::Action),

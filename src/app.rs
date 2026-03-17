@@ -49,8 +49,6 @@ pub struct AppModel {
     pub scratchpad_content: text_editor::Content,
     /// Multiline editor state for the calendar selected-day note.
     pub day_note_content: text_editor::Content,
-    /// Multiline editor state for the dashboard today note.
-    pub today_note_content: text_editor::Content,
 }
 
 impl cosmic::Application for AppModel {
@@ -118,13 +116,6 @@ impl cosmic::Application for AppModel {
             .map(String::as_str)
             .unwrap_or("");
         let day_note_content = text_editor::Content::with_text(day_note_text);
-        let today_note_text = data
-            .day_notes
-            .get(&today)
-            .map(String::as_str)
-            .unwrap_or("");
-        let today_note_content = text_editor::Content::with_text(today_note_text);
-
         let mut app = AppModel {
             core,
             context_page: ContextPage::default(),
@@ -148,7 +139,6 @@ impl cosmic::Application for AppModel {
             window_width: 800.0,
             scratchpad_content,
             day_note_content,
-            today_note_content,
         };
 
         let command = app.update_title();
@@ -189,7 +179,7 @@ impl cosmic::Application for AppModel {
                 &self.data,
                 self.cal_year,
                 self.cal_month,
-                &self.today_note_content,
+                &self.day_note_content,
                 self.window_width,
             ),
             Some(Page::Calendar) => ui::calendar_page::view(
@@ -342,14 +332,6 @@ impl cosmic::Application for AppModel {
                 self.mark_dirty();
             }
 
-            Message::TodayNoteAction(action) => {
-                self.today_note_content.perform(action);
-                let text = trim_editor_text(self.today_note_content.text());
-                let today = calendar::today_string();
-                self.data.set_day_note(today, text);
-                self.mark_dirty();
-            }
-
             Message::ClipboardTick => {
                 return iced_clipboard::read()
                     .map(|s| cosmic::Action::App(Message::ClipboardRead(s)));
@@ -407,14 +389,19 @@ impl cosmic::Application for AppModel {
                 let today = calendar::today_string();
                 if today != self.last_seen_date {
                     self.last_seen_date = today.clone();
-                    // Refresh the dashboard today-note editor to the new day.
+                    // Snap the selected date to the new day and refresh the editor.
+                    if let Some((y, m)) = parse_ym(&today) {
+                        self.cal_year = y;
+                        self.cal_month = m;
+                    }
                     let text = self
                         .data
                         .day_notes
                         .get(&today)
                         .map(String::as_str)
                         .unwrap_or("");
-                    self.today_note_content = text_editor::Content::with_text(text);
+                    self.day_note_content = text_editor::Content::with_text(text);
+                    self.data.selected_date = today;
                 }
             }
         }

@@ -18,7 +18,7 @@ pub fn view<'a>(
     data: &'a AppData,
     cal_year: i32,
     cal_month: u32,
-    today_note_content: &'a text_editor::Content,
+    day_note_content: &'a text_editor::Content,
     window_width: f32,
 ) -> cosmic::Element<'a, Message> {
     let spacing = cosmic::theme::spacing();
@@ -28,14 +28,20 @@ pub fn view<'a>(
     // ── Mini calendar ─────────────────────────────────────────────────────────
     let mini_cal = mini_calendar(data, cal_year, cal_month, space_xs);
 
-    // ── Today's note ──────────────────────────────────────────────────────────
+    // ── Selected day note ─────────────────────────────────────────────────────
     let today = calendar::today_string();
+    let selected = &data.selected_date;
+    let note_label = if selected == &today {
+        format!("Today · {today}")
+    } else {
+        format!("Note · {selected}")
+    };
     let note_section = widget::column::with_capacity(2)
-        .push(widget::text::title4(format!("Today · {today}")))
+        .push(widget::text::title4(note_label))
         .push(
-            text_editor(today_note_content)
-                .placeholder("No note for today yet. Write one…")
-                .on_action(Message::TodayNoteAction)
+            text_editor(day_note_content)
+                .placeholder("No note for this day yet. Write one…")
+                .on_action(Message::DayNoteAction)
                 .height(Length::Fixed(140.0)),
         )
         .spacing(space_xs);
