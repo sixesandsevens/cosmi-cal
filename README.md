@@ -7,6 +7,7 @@ A minimal calendar, notes, and clipboard utility for the COSMIC desktop
 Install CosmiCal into your user account without root:
 
 ```sh
+cargo build --release
 ./scripts/install-local.sh
 ```
 

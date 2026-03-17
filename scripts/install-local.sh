@@ -11,6 +11,7 @@ BIN_DIR="${HOME}/.local/bin"
 APP_DIR="${HOME}/.local/share/applications"
 ICON_DIR="${HOME}/.local/share/icons/hicolor/256x256/apps"
 
+BIN_SOURCE="${REPO_ROOT}/target/release/${APP_NAME}"
 BIN_TARGET="${BIN_DIR}/${APP_NAME}"
 DESKTOP_SOURCE="${REPO_ROOT}/packaging/${APP_ID}.desktop"
 DESKTOP_TARGET="${APP_DIR}/${APP_ID}.desktop"
@@ -20,11 +21,14 @@ ICON_TARGET="${ICON_DIR}/${APP_NAME}.png"
 
 mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_DIR"
 
-printf '%s\n' "Building release binary..."
-cargo build --manifest-path "${REPO_ROOT}/Cargo.toml" --release
+if [ ! -x "$BIN_SOURCE" ]; then
+    printf '%s\n' "Missing release binary: ${BIN_SOURCE}" >&2
+    printf '%s\n' "Build it first with: cargo build --release" >&2
+    exit 1
+fi
 
 printf '%s\n' "Installing binary to ${BIN_TARGET}..."
-install -m 0755 "${REPO_ROOT}/target/release/${APP_NAME}" "$BIN_TARGET"
+install -m 0755 "$BIN_SOURCE" "$BIN_TARGET"
 
 printf '%s\n' "Installing desktop entry to ${DESKTOP_TARGET}..."
 install -m 0644 "$DESKTOP_SOURCE" "$DESKTOP_TARGET"
