@@ -39,6 +39,10 @@ pub struct AppModel {
     dirty: bool,
     /// Counts down from SAVE_IDLE_TICKS after a change; saves when it hits 0.
     save_countdown: u8,
+    /// Set when the last save attempt failed; cleared on next successful save.
+    save_error: bool,
+    /// The calendar date last seen on the rollover tick, for midnight detection.
+    last_seen_date: String,
     /// Multiline editor state for the scratchpad.
     pub scratchpad_content: text_editor::Content,
     /// Multiline editor state for the calendar selected-day note.
@@ -137,6 +141,8 @@ impl cosmic::Application for AppModel {
             last_clipboard: None,
             dirty: false,
             save_countdown: 0,
+            save_error: false,
+            last_seen_date: today.clone(),
             scratchpad_content,
             day_note_content,
             today_note_content,
@@ -189,7 +195,7 @@ impl cosmic::Application for AppModel {
                 &self.day_note_content,
             ),
             Some(Page::Scratchpad) => {
-                ui::scratchpad_page::view(&self.scratchpad_content, self.dirty)
+                ui::scratchpad_page::view(&self.scratchpad_content, self.dirty, self.save_error)
             }
             Some(Page::Clipboard) => ui::clipboard_page::view(&self.data),
             None => widget::text("No page selected").into(),
@@ -235,7 +241,21 @@ impl cosmic::Application for AppModel {
             )
         });
 
-        Subscription::batch(vec![config_watch, clipboard_poll, save_tick])
+        // Date rollover: check every minute so we catch midnight.
+        let rollover_tick = Subscription::run(|| {
+            iced_futures::stream::channel(
+                1,
+                |mut tx: iced_futures::futures::channel::mpsc::Sender<Message>| async move {
+                    let mut interval = tokio::time::interval(Duration::from_secs(60));
+                    loop {
+                        interval.tick().await;
+                        let _ = tx.send(Message::DateRolloverTick).await;
+                    }
+                },
+            )
+        });
+
+        Subscription::batch(vec![config_watch, clipboard_poll, save_tick, rollover_tick])
     }
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
@@ -367,9 +387,30 @@ impl cosmic::Application for AppModel {
                 if self.dirty && self.save_countdown > 0 {
                     self.save_countdown -= 1;
                     if self.save_countdown == 0 {
-                        self.data.save();
-                        self.dirty = false;
+                        if self.data.save() {
+                            self.dirty = false;
+                            self.save_error = false;
+                        } else {
+                            self.save_error = true;
+                            // Retry next tick cycle.
+                            self.save_countdown = SAVE_IDLE_TICKS;
+                        }
                     }
+                }
+            }
+
+            Message::DateRolloverTick => {
+                let today = calendar::today_string();
+                if today != self.last_seen_date {
+                    self.last_seen_date = today.clone();
+                    // Refresh the dashboard today-note editor to the new day.
+                    let text = self
+                        .data
+                        .day_notes
+                        .get(&today)
+                        .map(String::as_str)
+                        .unwrap_or("");
+                    self.today_note_content = text_editor::Content::with_text(text);
                 }
             }
         }
@@ -379,8 +420,12 @@ impl cosmic::Application for AppModel {
     fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Self::Message>> {
         // Flush unsaved changes immediately when switching pages.
         if self.dirty {
-            self.data.save();
-            self.dirty = false;
+            if self.data.save() {
+                self.dirty = false;
+                self.save_error = false;
+            } else {
+                self.save_error = true;
+            }
             self.save_countdown = 0;
         }
         self.nav.activate(id);
@@ -391,7 +436,6 @@ impl cosmic::Application for AppModel {
         // Flush any pending changes synchronously before the process exits.
         if self.dirty {
             self.data.save();
-            self.dirty = false;
         }
         None
     }

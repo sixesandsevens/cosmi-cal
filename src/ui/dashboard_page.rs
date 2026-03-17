@@ -32,7 +32,7 @@ pub fn view<'a>(
             text_editor(today_note_content)
                 .placeholder("No note for today yet. Write one…")
                 .on_action(Message::TodayNoteAction)
-                .height(Length::Fixed(100.0)),
+                .height(Length::Fixed(140.0)),
         )
         .spacing(space_xs);
 
@@ -47,14 +47,21 @@ pub fn view<'a>(
         }
     }
 
-    // Recent (up to 3)
+    // Recent (up to 3, skipping anything already shown in pinned)
+    let recent: Vec<&String> = data
+        .clipboard_history
+        .iter()
+        .filter(|item| !data.pinned_clipboard.contains(item))
+        .take(3)
+        .collect();
+
     clip_col = clip_col.push(widget::text::title4("Recent"));
-    if data.clipboard_history.is_empty() {
+    if recent.is_empty() {
         clip_col = clip_col.push(
             widget::text("Nothing copied yet.\nCopy something to see it here."),
         );
     } else {
-        for item in data.clipboard_history.iter().take(3) {
+        for item in recent {
             clip_col = clip_col.push(dash_clip_row(item, space_xs));
         }
     }
@@ -70,7 +77,7 @@ pub fn view<'a>(
     widget::row::with_capacity(3)
         .push(
             widget::container(mini_cal)
-                .width(Length::Fixed(290.0))
+                .width(Length::Fixed(260.0))
                 .padding(space_s),
         )
         .push(widget::divider::vertical::default())

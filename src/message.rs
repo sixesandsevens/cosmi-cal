@@ -34,4 +34,5 @@ pub enum Message {
 
     // Persistence
     SaveTick,
+    DateRolloverTick,
 }

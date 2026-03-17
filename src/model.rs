@@ -39,9 +39,14 @@ impl AppData {
         storage::load_data().unwrap_or_default()
     }
 
-    pub fn save(&self) {
-        if let Err(e) = storage::save_data(self) {
-            eprintln!("Failed to save data: {e}");
+    /// Returns `true` on success, `false` on failure.
+    pub fn save(&self) -> bool {
+        match storage::save_data(self) {
+            Ok(()) => true,
+            Err(e) => {
+                eprintln!("Failed to save data: {e}");
+                false
+            }
         }
     }
 

@@ -8,12 +8,19 @@ use cosmic::widget::{self, text_editor};
 pub fn view<'a>(
     content: &'a text_editor::Content,
     dirty: bool,
+    save_error: bool,
 ) -> cosmic::Element<'a, Message> {
     let spacing = cosmic::theme::spacing();
     let space_s = spacing.space_s;
 
-    let dirty_indicator = if dirty { " ●" } else { "" };
-    let header = widget::text::title3(format!("{}{}", fl!("nav-scratchpad"), dirty_indicator));
+    let status = if save_error {
+        " ⚠ save failed"
+    } else if dirty {
+        " ●"
+    } else {
+        ""
+    };
+    let header = widget::text::title3(format!("{}{}", fl!("nav-scratchpad"), status));
 
     let editor = text_editor(content)
         .placeholder("Start writing… your thoughts live here.")
