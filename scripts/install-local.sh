@@ -21,11 +21,8 @@ ICON_TARGET="${ICON_DIR}/${APP_NAME}.png"
 
 mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_DIR"
 
-if [ ! -x "$BIN_SOURCE" ]; then
-    printf '%s\n' "Missing release binary: ${BIN_SOURCE}" >&2
-    printf '%s\n' "Build it first with: cargo build --release" >&2
-    exit 1
-fi
+printf '%s\n' "Building CosmiCal..."
+cargo build --manifest-path "${REPO_ROOT}/Cargo.toml" --release
 
 printf '%s\n' "Installing binary to ${BIN_TARGET}..."
 install -m 0755 "$BIN_SOURCE" "$BIN_TARGET"
