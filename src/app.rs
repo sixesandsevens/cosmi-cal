@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::calendar;
-use crate::clipboard as cb;
 use crate::config::Config;
 use crate::fl;
 use crate::message::Message;
@@ -10,7 +9,7 @@ use crate::ui;
 use chrono::Datelike;
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
-use cosmic::iced::Subscription;
+use cosmic::iced::{clipboard as iced_clipboard, Subscription};
 use cosmic::widget::{self, about::About, icon, menu, nav_bar, text_editor};
 use cosmic::{iced_futures, prelude::*};
 use futures_util::SinkExt;
@@ -307,13 +306,13 @@ impl cosmic::Application for AppModel {
 
             Message::ScratchpadAction(action) => {
                 self.scratchpad_content.perform(action);
-                self.data.scratchpad = self.scratchpad_content.text();
+                self.data.scratchpad = trim_editor_text(self.scratchpad_content.text());
                 self.mark_dirty();
             }
 
             Message::DayNoteAction(action) => {
                 self.day_note_content.perform(action);
-                let text = self.day_note_content.text();
+                let text = trim_editor_text(self.day_note_content.text());
                 self.data
                     .set_day_note(self.data.selected_date.clone(), text);
                 self.mark_dirty();
@@ -321,14 +320,19 @@ impl cosmic::Application for AppModel {
 
             Message::TodayNoteAction(action) => {
                 self.today_note_content.perform(action);
-                let text = self.today_note_content.text();
+                let text = trim_editor_text(self.today_note_content.text());
                 let today = calendar::today_string();
                 self.data.set_day_note(today, text);
                 self.mark_dirty();
             }
 
             Message::ClipboardTick => {
-                if let Some(text) = cb::get_text() {
+                return iced_clipboard::read()
+                    .map(|s| cosmic::Action::App(Message::ClipboardRead(s)));
+            }
+
+            Message::ClipboardRead(maybe_text) => {
+                if let Some(text) = maybe_text {
                     if self.last_clipboard.as_deref() != Some(text.as_str()) {
                         self.last_clipboard = Some(text.clone());
                         if self.data.push_clipboard(text) {
@@ -339,9 +343,8 @@ impl cosmic::Application for AppModel {
             }
 
             Message::RestoreClipboard(text) => {
-                if let Err(e) = cb::set_text(&text) {
-                    eprintln!("clipboard write failed: {e}");
-                }
+                return iced_clipboard::write(text)
+                    .map(|()| cosmic::Action::App(Message::SaveTick));
             }
 
             Message::PinClipboard(text) => {
@@ -448,4 +451,13 @@ fn parse_ym(date: &str) -> Option<(i32, u32)> {
     } else {
         None
     }
+}
+
+/// `text_editor::Content::text()` always appends a trailing newline.
+/// Strip it before storing so saved content round-trips cleanly.
+fn trim_editor_text(mut s: String) -> String {
+    if s.ends_with('\n') {
+        s.pop();
+    }
+    s
 }

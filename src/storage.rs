@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::model::AppData;
-use directories::ProjectDirs;
 use std::fs;
 use std::path::PathBuf;
 
 fn data_path() -> Result<PathBuf, String> {
-    let proj = ProjectDirs::from("io.github", "sixesandsevens", "cosmical")
-        .ok_or_else(|| "Could not determine config directory".to_string())?;
-    let dir = proj.config_dir();
-    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    // Deliberately ignore XDG_CONFIG_HOME so the path is stable regardless of
+    // which environment (terminal, desktop launcher, flatpak wrapper) the app
+    // is started from.
+    let home = std::env::var("HOME").map_err(|_| "HOME is not set".to_string())?;
+    let dir = PathBuf::from(home).join(".config").join("cosmical");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join("data.json"))
 }
 

@@ -2,7 +2,6 @@
 
 mod app;
 mod calendar;
-mod clipboard;
 mod config;
 mod i18n;
 mod message;

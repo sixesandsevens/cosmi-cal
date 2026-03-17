@@ -26,6 +26,7 @@ pub enum Message {
 
     // Clipboard
     ClipboardTick,
+    ClipboardRead(Option<String>),
     RestoreClipboard(String),
     PinClipboard(String),
     UnpinClipboard(String),

@@ -3,7 +3,16 @@
     "allow": [
       "Bash(source ~/.cargo/env)",
       "Read(//home/sixesandsevens/.cargo/git/checkouts/libcosmic-41009aea1d72760b/9602dfd/src/theme/style/**)",
-      "Bash(cargo build:*)"
+      "Bash(cargo build:*)",
+      "Bash(echo $XDG_SESSION_TYPE)",
+      "Bash(echo $WAYLAND_DISPLAY)",
+      "Bash(echo $DISPLAY)",
+      "Bash(wl-paste)",
+      "Bash(echo \"exit: $?\")",
+      "Read(//home/sixesandsevens/.config/**)",
+      "Read(//home/sixesandsevens/.config/dev.sixesandsevens/**)",
+      "Read(//home/sixesandsevens/.var/app/com.visualstudio.code/config/io.github/sixesandsevens/**)",
+      "Read(//home/sixesandsevens/.var/app/com.visualstudio.code/config/io.github/sixesandsevens/cosmical/**)"
     ]
   }
 }

@@ -39,9 +39,10 @@ pub fn view<'a>(
 
     // ── Day note ──────────────────────────────────────────────────────────────
     let today = calendar::today_string();
-    let is_today = data.selected_date == today;
-    let note_label = if is_today {
+    let note_label = if data.selected_date == today {
         format!("Note — {} · Today", data.selected_date)
+    } else if data.selected_date > today {
+        format!("Note — {} · Upcoming", data.selected_date)
     } else {
         format!("Note — {}", data.selected_date)
     };
