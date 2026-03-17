@@ -3,7 +3,7 @@
   <id>io.github.sixesandsevens.cosmical</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MPL-2.0</project_license>
-  <name>Cosmi Cal</name>
+  <name>CosmiCal</name>
   <summary>A minimal calendar, notes, and clipboard utility for the COSMIC desktop</summary>
   <icon type="remote" width="64" height="64" scale="1">
     https://github.com/sixesandsevens/cosmi-cal/raw/main/resources/icons/hicolor/scalable/apps/icon.svg
@@ -32,4 +32,3 @@
   </keywords>
   <content_rating type="oars-1.1" />
 </component>
-

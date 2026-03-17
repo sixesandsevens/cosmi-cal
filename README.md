@@ -1,10 +1,55 @@
-# Cosmi Cal
+# CosmiCal
 
 A minimal calendar, notes, and clipboard utility for the COSMIC desktop
 
-## Installation
+## Local install
 
-A [justfile](./justfile) is included by default for the [casey/just][just] command runner.
+Install CosmiCal into your user account without root:
+
+```sh
+./scripts/install-local.sh
+```
+
+This installs:
+
+- `~/.local/bin/cosmi-cal`
+- `~/.local/share/applications/io.github.sixesandsevens.cosmical.desktop`
+- `~/.local/share/icons/hicolor/256x256/apps/io.github.sixesandsevens.cosmical.png`
+
+After installation, launch `CosmiCal` from your app launcher or run:
+
+```sh
+cosmi-cal
+```
+
+To remove the user-local install:
+
+```sh
+./scripts/uninstall-local.sh
+```
+
+## Summon shortcut
+
+CosmiCal supports a first-pass summon mode intended for COSMIC keyboard shortcuts:
+
+```sh
+cosmi-cal --summon
+```
+
+Bind Super + C in COSMIC Settings to:
+
+```sh
+cosmi-cal --summon
+```
+
+Behavior:
+
+- if CosmiCal is not running, it launches in surface mode
+- if it is already running, the existing window is focused and the today note is targeted
+
+## Development
+
+A [justfile](./justfile) is included for the [casey/just][just] command runner.
 
 - `just` builds the application with the default `just build-release` recipe
 - `just run` builds and runs the application

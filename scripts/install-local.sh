@@ -15,6 +15,7 @@ BIN_TARGET="${BIN_DIR}/${APP_NAME}"
 DESKTOP_SOURCE="${REPO_ROOT}/packaging/${APP_ID}.desktop"
 DESKTOP_TARGET="${APP_DIR}/${APP_ID}.desktop"
 ICON_SOURCE="${REPO_ROOT}/resources/icons/hicolor/scalable/apps/icon.svg"
+ICON_PNG_SOURCE="${REPO_ROOT}/resources/icons/hicolor/256x256/apps/icon.png"
 ICON_TARGET="${ICON_DIR}/${APP_ID}.png"
 
 mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_DIR"
@@ -28,11 +29,14 @@ install -m 0755 "${REPO_ROOT}/target/release/${APP_NAME}" "$BIN_TARGET"
 printf '%s\n' "Installing desktop entry to ${DESKTOP_TARGET}..."
 install -m 0644 "$DESKTOP_SOURCE" "$DESKTOP_TARGET"
 
-printf '%s\n' "Rendering icon to ${ICON_TARGET}..."
-if command -v rsvg-convert >/dev/null 2>&1; then
+if [ -f "$ICON_PNG_SOURCE" ]; then
+    printf '%s\n' "Installing packaged icon to ${ICON_TARGET}..."
+    install -m 0644 "$ICON_PNG_SOURCE" "$ICON_TARGET"
+elif command -v rsvg-convert >/dev/null 2>&1; then
+    printf '%s\n' "Rendering icon to ${ICON_TARGET}..."
     rsvg-convert -w 256 -h 256 "$ICON_SOURCE" -o "$ICON_TARGET"
 else
-    printf '%s\n' "rsvg-convert not found; skipping icon render." >&2
+    printf '%s\n' "No packaged PNG icon and rsvg-convert not found; the launcher may appear without an icon until one is installed." >&2
 fi
 
 if command -v update-desktop-database >/dev/null 2>&1; then
@@ -48,3 +52,4 @@ printf '%s\n' "Local install complete."
 printf '%s\n' "Binary: ${BIN_TARGET}"
 printf '%s\n' "Desktop entry: ${DESKTOP_TARGET}"
 printf '%s\n' "Icon: ${ICON_TARGET}"
+printf '%s\n' "If the launcher icon does not appear immediately, try logging out and back in or refreshing your app launcher."
