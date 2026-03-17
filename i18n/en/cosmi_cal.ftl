@@ -1,4 +1,4 @@
-app-title = Cosmi Cal
+app-title = CosmiCal
 about = About
 repository = Repository
 view = View
