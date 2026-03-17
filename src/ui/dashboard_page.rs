@@ -11,11 +11,15 @@ use crate::ui::calendar_grid;
 use cosmic::iced::{Alignment, Length};
 use cosmic::widget::{self, text_editor};
 
+/// Width threshold below which the dashboard stacks vertically.
+const WIDE_BREAKPOINT: f32 = 580.0;
+
 pub fn view<'a>(
     data: &'a AppData,
     cal_year: i32,
     cal_month: u32,
     today_note_content: &'a text_editor::Content,
+    window_width: f32,
 ) -> cosmic::Element<'a, Message> {
     let spacing = cosmic::theme::spacing();
     let space_s = spacing.space_s;
@@ -36,23 +40,27 @@ pub fn view<'a>(
         )
         .spacing(space_xs);
 
+    let wide = window_width >= WIDE_BREAKPOINT;
+
     // ── Clipboard preview ─────────────────────────────────────────────────────
+    // Show fewer items in narrow mode to avoid vertical overflow.
+    let clip_limit = if wide { 3 } else { 2 };
     let mut clip_col = widget::column::with_capacity(8).spacing(space_xs);
 
-    // Pinned first (up to 3)
+    // Pinned first
     if !data.pinned_clipboard.is_empty() {
         clip_col = clip_col.push(widget::text::title4("Pinned"));
-        for item in data.pinned_clipboard.iter().take(3) {
+        for item in data.pinned_clipboard.iter().take(clip_limit) {
             clip_col = clip_col.push(dash_clip_row(item, space_xs));
         }
     }
 
-    // Recent (up to 3, skipping anything already shown in pinned)
+    // Recent (skipping anything already shown in pinned)
     let recent: Vec<&String> = data
         .clipboard_history
         .iter()
         .filter(|item| !data.pinned_clipboard.contains(item))
-        .take(3)
+        .take(clip_limit)
         .collect();
 
     clip_col = clip_col.push(widget::text::title4("Recent"));
@@ -66,7 +74,7 @@ pub fn view<'a>(
         }
     }
 
-    // ── Layout: calendar left, note + clipboard right ─────────────────────────
+    // ── Layout ────────────────────────────────────────────────────────────────
     let right_col = widget::column::with_capacity(3)
         .push(note_section)
         .push(widget::divider::horizontal::default())
@@ -74,21 +82,41 @@ pub fn view<'a>(
         .spacing(space_s)
         .width(Length::Fill);
 
-    widget::row::with_capacity(3)
-        .push(
-            widget::container(mini_cal)
-                .width(Length::Fixed(260.0))
-                .padding(space_s),
-        )
-        .push(widget::divider::vertical::default())
-        .push(
-            widget::container(right_col)
-                .width(Length::Fill)
-                .padding(space_s),
-        )
-        .spacing(space_s)
-        .height(Length::Fill)
-        .into()
+    if wide {
+        // Side-by-side: calendar left, note + clipboard right.
+        widget::row::with_capacity(3)
+            .push(
+                widget::container(mini_cal)
+                    .width(Length::Fixed(260.0))
+                    .padding(space_s),
+            )
+            .push(widget::divider::vertical::default())
+            .push(
+                widget::container(right_col)
+                    .width(Length::Fill)
+                    .padding(space_s),
+            )
+            .spacing(space_s)
+            .height(Length::Fill)
+            .into()
+    } else {
+        // Stacked: calendar top, note + clipboard below.
+        widget::column::with_capacity(3)
+            .push(
+                widget::container(mini_cal)
+                    .width(Length::Fill)
+                    .padding(space_s),
+            )
+            .push(widget::divider::horizontal::default())
+            .push(
+                widget::container(right_col)
+                    .width(Length::Fill)
+                    .padding(space_s),
+            )
+            .spacing(space_s)
+            .height(Length::Fill)
+            .into()
+    }
 }
 
 fn mini_calendar<'a>(

@@ -7,9 +7,7 @@ description = "A minimal calendar, notes, and clipboard utility for the COSMIC d
 repository = "https://github.com/sixesandsevens/cosmi-cal"
 
 [dependencies]
-arboard = "3"
 chrono = { version = "0.4", features = ["serde"] }
-directories = "5"
 futures-util = "0.3.31"
 i18n-embed = { version = "0.16", features = [
     "fluent-system",

@@ -17,7 +17,12 @@ fn data_path() -> Result<PathBuf, String> {
 pub fn save_data(data: &AppData) -> Result<(), String> {
     let path = data_path()?;
     let json = serde_json::to_string_pretty(data).map_err(|e| e.to_string())?;
-    fs::write(path, json).map_err(|e| e.to_string())
+
+    // Write to a temp file in the same directory, then rename into place.
+    // This makes the save atomic: a crash mid-write leaves the old file intact.
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, &json).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &path).map_err(|e| e.to_string())
 }
 
 pub fn load_data() -> Result<AppData, String> {

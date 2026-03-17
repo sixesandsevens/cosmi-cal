@@ -43,6 +43,8 @@ pub struct AppModel {
     save_error: bool,
     /// The calendar date last seen on the rollover tick, for midnight detection.
     last_seen_date: String,
+    /// Current window width in logical pixels, updated via on_window_resize.
+    pub window_width: f32,
     /// Multiline editor state for the scratchpad.
     pub scratchpad_content: text_editor::Content,
     /// Multiline editor state for the calendar selected-day note.
@@ -143,6 +145,7 @@ impl cosmic::Application for AppModel {
             save_countdown: 0,
             save_error: false,
             last_seen_date: today.clone(),
+            window_width: 800.0,
             scratchpad_content,
             day_note_content,
             today_note_content,
@@ -187,6 +190,7 @@ impl cosmic::Application for AppModel {
                 self.cal_year,
                 self.cal_month,
                 &self.today_note_content,
+                self.window_width,
             ),
             Some(Page::Calendar) => ui::calendar_page::view(
                 &self.data,
@@ -415,6 +419,10 @@ impl cosmic::Application for AppModel {
             }
         }
         Task::none()
+    }
+
+    fn on_window_resize(&mut self, _id: cosmic::iced::window::Id, width: f32, _height: f32) {
+        self.window_width = width;
     }
 
     fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Self::Message>> {
