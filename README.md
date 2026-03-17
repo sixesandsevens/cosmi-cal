@@ -31,6 +31,24 @@ To remove the user-local install:
 ./scripts/uninstall-local.sh
 ```
 
+## Autostart
+
+Enable CosmiCal on login:
+
+```sh
+./scripts/enable-autostart.sh
+```
+
+Disable autostart:
+
+```sh
+./scripts/disable-autostart.sh
+```
+
+The helper scripts manage:
+
+- `~/.config/autostart/io.github.sixesandsevens.cosmical.desktop`
+
 ## Summon shortcut
 
 CosmiCal supports a first-pass summon mode intended for COSMIC keyboard shortcuts:
