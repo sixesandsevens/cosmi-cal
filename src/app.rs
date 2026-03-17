@@ -10,8 +10,8 @@ use crate::ui;
 use chrono::Datelike;
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
-use cosmic::iced::{Subscription};
-use cosmic::widget::{self, about::About, icon, menu, nav_bar};
+use cosmic::iced::Subscription;
+use cosmic::widget::{self, about::About, icon, menu, nav_bar, text_editor};
 use cosmic::{iced_futures, prelude::*};
 use futures_util::SinkExt;
 use std::collections::HashMap;
@@ -40,6 +40,12 @@ pub struct AppModel {
     dirty: bool,
     /// Counts down from SAVE_IDLE_TICKS after a change; saves when it hits 0.
     save_countdown: u8,
+    /// Multiline editor state for the scratchpad.
+    pub scratchpad_content: text_editor::Content,
+    /// Multiline editor state for the calendar selected-day note.
+    pub day_note_content: text_editor::Content,
+    /// Multiline editor state for the dashboard today note.
+    pub today_note_content: text_editor::Content,
 }
 
 impl cosmic::Application for AppModel {
@@ -100,6 +106,20 @@ impl cosmic::Application for AppModel {
                 (now.year(), now.month())
             });
 
+        let scratchpad_content = text_editor::Content::with_text(&data.scratchpad);
+        let day_note_text = data
+            .day_notes
+            .get(&data.selected_date)
+            .map(String::as_str)
+            .unwrap_or("");
+        let day_note_content = text_editor::Content::with_text(day_note_text);
+        let today_note_text = data
+            .day_notes
+            .get(&today)
+            .map(String::as_str)
+            .unwrap_or("");
+        let today_note_content = text_editor::Content::with_text(today_note_text);
+
         let mut app = AppModel {
             core,
             context_page: ContextPage::default(),
@@ -118,6 +138,9 @@ impl cosmic::Application for AppModel {
             last_clipboard: None,
             dirty: false,
             save_countdown: 0,
+            scratchpad_content,
+            day_note_content,
+            today_note_content,
         };
 
         let command = app.update_title();
@@ -154,13 +177,21 @@ impl cosmic::Application for AppModel {
 
     fn view(&self) -> Element<'_, Self::Message> {
         let content: Element<_> = match self.nav.active_data::<Page>() {
-            Some(Page::Dashboard) => {
-                ui::dashboard_page::view(&self.data, self.cal_year, self.cal_month)
+            Some(Page::Dashboard) => ui::dashboard_page::view(
+                &self.data,
+                self.cal_year,
+                self.cal_month,
+                &self.today_note_content,
+            ),
+            Some(Page::Calendar) => ui::calendar_page::view(
+                &self.data,
+                self.cal_year,
+                self.cal_month,
+                &self.day_note_content,
+            ),
+            Some(Page::Scratchpad) => {
+                ui::scratchpad_page::view(&self.scratchpad_content, self.dirty)
             }
-            Some(Page::Calendar) => {
-                ui::calendar_page::view(&self.data, self.cal_year, self.cal_month)
-            }
-            Some(Page::Scratchpad) => ui::scratchpad_page::view(&self.data, self.dirty),
             Some(Page::Clipboard) => ui::clipboard_page::view(&self.data),
             None => widget::text("No page selected").into(),
         };
@@ -245,27 +276,54 @@ impl cosmic::Application for AppModel {
                     self.cal_year = y;
                     self.cal_month = m;
                 }
-                self.data.selected_date = today;
+                self.data.selected_date = today.clone();
+                // Re-initialize day note editor for the newly selected date.
+                let text = self
+                    .data
+                    .day_notes
+                    .get(&today)
+                    .map(String::as_str)
+                    .unwrap_or("");
+                self.day_note_content = text_editor::Content::with_text(text);
                 self.mark_dirty();
             }
 
             Message::SelectDate(date) => {
-                // Jump calendar view to match selected date's month.
                 if let Some((y, m)) = parse_ym(&date) {
                     self.cal_year = y;
                     self.cal_month = m;
                 }
+                // Re-initialize day note editor for the newly selected date.
+                let text = self
+                    .data
+                    .day_notes
+                    .get(&date)
+                    .map(String::as_str)
+                    .unwrap_or("");
+                self.day_note_content = text_editor::Content::with_text(text);
                 self.data.selected_date = date;
                 self.mark_dirty();
             }
 
-            Message::SetDayNote { date, text } => {
-                self.data.set_day_note(date, text);
+            Message::ScratchpadAction(action) => {
+                self.scratchpad_content.perform(action);
+                self.data.scratchpad = self.scratchpad_content.text();
                 self.mark_dirty();
             }
 
-            Message::ScratchpadChanged(text) => {
-                self.data.scratchpad = text;
+            Message::DayNoteAction(action) => {
+                self.day_note_content.perform(action);
+                let text = self.day_note_content.text();
+                self.data
+                    .set_day_note(self.data.selected_date.clone(), text);
+                self.mark_dirty();
+            }
+
+            Message::TodayNoteAction(action) => {
+                self.today_note_content.perform(action);
+                let text = self.today_note_content.text();
+                let today = calendar::today_string();
+                self.data.set_day_note(today, text);
                 self.mark_dirty();
             }
 

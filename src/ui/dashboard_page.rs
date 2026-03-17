@@ -9,60 +9,60 @@ use crate::message::Message;
 use crate::model::AppData;
 use crate::ui::calendar_grid;
 use cosmic::iced::{Alignment, Length};
-use cosmic::widget;
+use cosmic::widget::{self, text_editor};
 
-pub fn view<'a>(data: &'a AppData, cal_year: i32, cal_month: u32) -> cosmic::Element<'a, Message> {
+pub fn view<'a>(
+    data: &'a AppData,
+    cal_year: i32,
+    cal_month: u32,
+    today_note_content: &'a text_editor::Content,
+) -> cosmic::Element<'a, Message> {
     let spacing = cosmic::theme::spacing();
     let space_s = spacing.space_s;
     let space_xs = spacing.space_xs;
-    let space_m = spacing.space_m;
 
     // ── Mini calendar ─────────────────────────────────────────────────────────
     let mini_cal = mini_calendar(data, cal_year, cal_month, space_xs);
 
     // ── Today's note ──────────────────────────────────────────────────────────
     let today = calendar::today_string();
-    let today_note_text = data.day_notes.get(&today).map(String::as_str).unwrap_or("");
-    let today_for_closure = today.clone();
     let note_section = widget::column::with_capacity(2)
         .push(widget::text::title4(format!("Today · {today}")))
         .push(
-            widget::text_input("No note for today yet. Write one…", today_note_text)
-                .on_input(move |t| Message::SetDayNote {
-                    date: today_for_closure.clone(),
-                    text: t,
-                })
-                .width(Length::Fill),
+            text_editor(today_note_content)
+                .placeholder("No note for today yet. Write one…")
+                .on_action(Message::TodayNoteAction)
+                .height(Length::Fixed(100.0)),
         )
         .spacing(space_xs);
 
     // ── Clipboard preview ─────────────────────────────────────────────────────
-    let mut clip_col = widget::column::with_capacity(6).spacing(space_xs);
-    clip_col = clip_col.push(widget::text::title4("Recent Clipboard"));
+    let mut clip_col = widget::column::with_capacity(8).spacing(space_xs);
 
+    // Pinned first (up to 3)
+    if !data.pinned_clipboard.is_empty() {
+        clip_col = clip_col.push(widget::text::title4("Pinned"));
+        for item in data.pinned_clipboard.iter().take(3) {
+            clip_col = clip_col.push(dash_clip_row(item, space_xs));
+        }
+    }
+
+    // Recent (up to 3)
+    clip_col = clip_col.push(widget::text::title4("Recent"));
     if data.clipboard_history.is_empty() {
-        clip_col = clip_col.push(widget::text("Nothing copied yet."));
+        clip_col = clip_col.push(
+            widget::text("Nothing copied yet.\nCopy something to see it here."),
+        );
     } else {
-        for item in data.clipboard_history.iter().take(5) {
-            let preview = truncate(item, 48);
-            let owned = item.clone();
-            clip_col = clip_col.push(
-                widget::row::with_capacity(2)
-                    .push(widget::text(preview).width(Length::Fill))
-                    .push(
-                        widget::button::standard("Restore")
-                            .on_press(Message::RestoreClipboard(owned)),
-                    )
-                    .align_y(Alignment::Center)
-                    .spacing(space_xs),
-            );
+        for item in data.clipboard_history.iter().take(3) {
+            clip_col = clip_col.push(dash_clip_row(item, space_xs));
         }
     }
 
     // ── Layout: calendar left, note + clipboard right ─────────────────────────
     let right_col = widget::column::with_capacity(3)
         .push(note_section)
-        .push(widget::Space::new().height(Length::Fixed(space_m as f32)))
+        .push(widget::divider::horizontal::default())
         .push(clip_col)
         .spacing(space_s)
         .width(Length::Fill);
@@ -103,6 +103,20 @@ fn mini_calendar<'a>(
         .push(calendar_grid::dow_row(CELL, 2))
         .push(calendar_grid::day_grid(data, cal_year, cal_month, CELL, 2))
         .push(today_btn)
+        .spacing(space_xs)
+        .into()
+}
+
+fn dash_clip_row(item: &str, space_xs: u16) -> cosmic::Element<'_, Message> {
+    let preview = truncate(item, 40);
+    let owned = item.to_string();
+    widget::row::with_capacity(2)
+        .push(widget::text(preview).width(Length::Fill))
+        .push(
+            widget::button::text("Restore")
+                .on_press(Message::RestoreClipboard(owned)),
+        )
+        .align_y(Alignment::Center)
         .spacing(space_xs)
         .into()
 }

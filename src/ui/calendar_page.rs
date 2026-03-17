@@ -6,9 +6,14 @@ use crate::model::AppData;
 use crate::ui::calendar_grid;
 use cosmic::iced::alignment::Horizontal;
 use cosmic::iced::{Alignment, Length};
-use cosmic::widget;
+use cosmic::widget::{self, text_editor};
 
-pub fn view<'a>(data: &'a AppData, cal_year: i32, cal_month: u32) -> cosmic::Element<'a, Message> {
+pub fn view<'a>(
+    data: &'a AppData,
+    cal_year: i32,
+    cal_month: u32,
+    note_content: &'a text_editor::Content,
+) -> cosmic::Element<'a, Message> {
     let spacing = cosmic::theme::spacing();
     let space_s = spacing.space_s;
     let space_xs = spacing.space_xs;
@@ -33,16 +38,19 @@ pub fn view<'a>(data: &'a AppData, cal_year: i32, cal_month: u32) -> cosmic::Ele
     let today_btn = widget::button::standard("Today").on_press(Message::GoToToday);
 
     // ── Day note ──────────────────────────────────────────────────────────────
-    let note_header = widget::text::title4(format!("Note — {}", data.selected_date));
-    let note_placeholder = if data.selected_day_note().is_empty() {
-        "Nothing yet. Add a note for this day…"
+    let today = calendar::today_string();
+    let is_today = data.selected_date == today;
+    let note_label = if is_today {
+        format!("Note — {} · Today", data.selected_date)
     } else {
-        ""
+        format!("Note — {}", data.selected_date)
     };
-    let selected = data.selected_date.clone();
-    let note_editor = widget::text_input(note_placeholder, data.selected_day_note())
-        .on_input(move |t| Message::SetDayNote { date: selected.clone(), text: t })
-        .width(Length::Fill);
+    let note_header = widget::text::title4(note_label);
+
+    let note_editor = text_editor(note_content)
+        .placeholder("No note for this day yet. Select a day and start typing.")
+        .on_action(Message::DayNoteAction)
+        .height(Length::Fixed(160.0));
 
     widget::column::with_capacity(7)
         .push(nav)

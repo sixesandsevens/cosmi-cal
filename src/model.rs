@@ -45,13 +45,6 @@ impl AppData {
         }
     }
 
-    pub fn selected_day_note(&self) -> &str {
-        self.day_notes
-            .get(&self.selected_date)
-            .map(String::as_str)
-            .unwrap_or("")
-    }
-
     pub fn set_day_note(&mut self, date: String, text: String) {
         if text.is_empty() {
             self.day_notes.remove(&date);

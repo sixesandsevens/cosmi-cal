@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::config::Config;
+use cosmic::widget::text_editor;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -15,11 +16,13 @@ pub enum Message {
     SelectDate(String),
     GoToToday,
 
-    // Day note
-    SetDayNote { date: String, text: String },
+    // Day note (calendar page editor)
+    DayNoteAction(text_editor::Action),
+    // Day note (dashboard today editor)
+    TodayNoteAction(text_editor::Action),
 
     // Scratchpad
-    ScratchpadChanged(String),
+    ScratchpadAction(text_editor::Action),
 
     // Clipboard
     ClipboardTick,
