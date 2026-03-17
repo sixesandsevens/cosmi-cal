@@ -16,7 +16,7 @@ pub enum Message {
     GoToToday,
 
     // Day note
-    DayNoteChanged(String),
+    SetDayNote { date: String, text: String },
 
     // Scratchpad
     ScratchpadChanged(String),

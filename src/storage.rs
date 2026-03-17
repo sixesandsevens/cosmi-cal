@@ -6,7 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 fn data_path() -> Result<PathBuf, String> {
-    let proj = ProjectDirs::from("dev", "sixesandsevens", "cosmi-cal")
+    let proj = ProjectDirs::from("io.github", "sixesandsevens", "cosmical")
         .ok_or_else(|| "Could not determine config directory".to_string())?;
     let dir = proj.config_dir();
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;

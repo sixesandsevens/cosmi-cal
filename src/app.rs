@@ -47,7 +47,7 @@ impl cosmic::Application for AppModel {
     type Flags = ();
     type Message = Message;
 
-    const APP_ID: &'static str = "dev.sixesandsevens.cosmi-cal";
+    const APP_ID: &'static str = "io.github.sixesandsevens.cosmical";
 
     fn core(&self) -> &cosmic::Core {
         &self.core
@@ -259,8 +259,8 @@ impl cosmic::Application for AppModel {
                 self.mark_dirty();
             }
 
-            Message::DayNoteChanged(text) => {
-                self.data.set_selected_day_note(text);
+            Message::SetDayNote { date, text } => {
+                self.data.set_day_note(date, text);
                 self.mark_dirty();
             }
 
@@ -298,6 +298,7 @@ impl cosmic::Application for AppModel {
 
             Message::ClearClipboardHistory => {
                 self.data.clear_clipboard_history();
+                self.last_clipboard = None;
                 self.mark_dirty();
             }
 

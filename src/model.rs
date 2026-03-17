@@ -52,11 +52,11 @@ impl AppData {
             .unwrap_or("")
     }
 
-    pub fn set_selected_day_note(&mut self, text: String) {
+    pub fn set_day_note(&mut self, date: String, text: String) {
         if text.is_empty() {
-            self.day_notes.remove(&self.selected_date);
+            self.day_notes.remove(&date);
         } else {
-            self.day_notes.insert(self.selected_date.clone(), text);
+            self.day_notes.insert(date, text);
         }
     }
 
