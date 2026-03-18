@@ -88,23 +88,45 @@ struct LaunchPlan {
 
 impl LaunchPlan {
     fn from_args() -> Self {
-        let mut plan = Self::default();
+        Self::from_iter(std::env::args().skip(1))
+    }
 
-        for arg in std::env::args().skip(1) {
+    fn from_iter(args: impl IntoIterator<Item = String>) -> Self {
+        let mut plan = Self::default();
+        let mut summon = false;
+        let mut focus_today = false;
+        let mut focus_scratchpad = false;
+
+        for arg in args {
             match arg.as_str() {
                 "--summon" => {
-                    plan.shell_mode_env = Some("surface".to_string());
-                    plan.commands.push(commands::AppCommand::SummonToggle);
+                    summon = true;
                 }
                 "--focus-today" => {
-                    plan.shell_mode_env = Some("surface".to_string());
-                    plan.commands.push(commands::AppCommand::FocusTodayNote);
+                    focus_today = true;
                 }
                 "--focus-scratchpad" => {
-                    plan.shell_mode_env = Some("full".to_string());
-                    plan.commands.push(commands::AppCommand::FocusScratchpad);
+                    focus_scratchpad = true;
                 }
                 _ => {}
+            }
+        }
+
+        if summon {
+            plan.shell_mode_env = Some("surface".to_string());
+            if focus_scratchpad {
+                plan.commands.push(commands::AppCommand::SummonScratchpad);
+            } else {
+                plan.commands.push(commands::AppCommand::SummonToggle);
+            }
+        } else {
+            if focus_today {
+                plan.shell_mode_env = Some("surface".to_string());
+                plan.commands.push(commands::AppCommand::FocusTodayNote);
+            }
+            if focus_scratchpad {
+                plan.shell_mode_env = Some("surface".to_string());
+                plan.commands.push(commands::AppCommand::FocusScratchpad);
             }
         }
 
@@ -120,5 +142,31 @@ impl LaunchPlan {
         } else {
             self.commands.clone()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LaunchPlan;
+    use crate::commands::AppCommand;
+
+    #[test]
+    fn summon_scratchpad_uses_single_toggle_command() {
+        let plan = launch_plan_from(["cosmi-cal", "--summon", "--focus-scratchpad"]);
+
+        assert_eq!(plan.shell_mode_env.as_deref(), Some("surface"));
+        assert_eq!(plan.commands, vec![AppCommand::SummonScratchpad]);
+    }
+
+    #[test]
+    fn plain_scratchpad_focus_uses_surface_mode() {
+        let plan = launch_plan_from(["cosmi-cal", "--focus-scratchpad"]);
+
+        assert_eq!(plan.shell_mode_env.as_deref(), Some("surface"));
+        assert_eq!(plan.commands, vec![AppCommand::FocusScratchpad]);
+    }
+
+    fn launch_plan_from<'a>(args: impl IntoIterator<Item = &'a str>) -> LaunchPlan {
+        LaunchPlan::from_iter(args.into_iter().skip(1).map(str::to_string))
     }
 }

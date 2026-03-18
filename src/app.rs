@@ -98,7 +98,7 @@ impl cosmic::Application for AppModel {
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         let shell_mode = ShellMode::from_env();
 
-        if shell_mode.is_dashboard() {
+        if shell_mode.hides_headerbar() {
             core.window.show_headerbar = false;
         }
         if shell_mode == ShellMode::Surface {
@@ -200,7 +200,7 @@ impl cosmic::Application for AppModel {
     }
 
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
-        if self.shell_mode.is_dashboard() {
+        if self.shell_mode.hides_headerbar() {
             return vec![];
         }
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
@@ -234,7 +234,7 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let content: Element<_> = if self.shell_mode.is_dashboard() {
+        let content: Element<_> = if self.shell_mode.is_dashboard_only() {
             ui::dashboard_page::view(
                 &self.data,
                 self.cal_year,
@@ -436,10 +436,20 @@ impl cosmic::Application for AppModel {
                 return self.handle_app_command(AppCommand::DismissSurface);
             }
 
+            Message::Event(Event::Window(window::Event::Focused)) => {
+                if self.pending_focus != FocusTarget::None {
+                    return self.focus_pending_target();
+                }
+            }
+
             Message::Event(_) => {}
 
             Message::AppCommand(command) => {
                 return self.handle_app_command(command);
+            }
+
+            Message::ApplyPendingFocus => {
+                return self.focus_pending_target();
             }
 
             Message::SaveTick => {
@@ -521,18 +531,10 @@ impl AppModel {
 
     fn handle_app_command(&mut self, command: AppCommand) -> Task<cosmic::Action<Message>> {
         match command {
-            AppCommand::SummonToggle => {
-                if self.main_window_is_focused() {
-                    self.dismiss_surface()
-                } else {
-                    Task::batch(vec![
-                        self.handle_app_command(AppCommand::ShowSurface),
-                        self.handle_app_command(AppCommand::FocusTodayNote),
-                    ])
-                }
-            }
+            AppCommand::SummonToggle => self.handle_summon(FocusTarget::TodayNote),
+            AppCommand::SummonScratchpad => self.handle_summon(FocusTarget::Scratchpad),
             AppCommand::ShowSurface => {
-                if !self.shell_mode.is_dashboard() {
+                if !self.shell_mode.is_dashboard_only() {
                     self.nav.activate(self.page_ids.dashboard);
                 }
 
@@ -540,31 +542,37 @@ impl AppModel {
             }
             AppCommand::DismissSurface => self.dismiss_surface(),
             AppCommand::FocusTodayNote => {
-                if !self.shell_mode.is_dashboard() {
+                if !self.shell_mode.is_dashboard_only() {
                     self.nav.activate(self.page_ids.dashboard);
                 }
 
                 self.select_date_internal(calendar::today_string(), true);
-                self.pending_focus = FocusTarget::TodayNote;
-
-                Task::batch(vec![
-                    self.focus_main_window(),
-                    self.focus_pending_target(),
-                    self.update_title(),
-                ])
+                self.schedule_focus(FocusTarget::TodayNote)
             }
             AppCommand::FocusScratchpad => {
-                if !self.shell_mode.is_dashboard() {
+                if !self.shell_mode.is_dashboard_only() {
                     self.nav.activate(self.page_ids.scratchpad);
                 }
 
-                self.pending_focus = FocusTarget::Scratchpad;
+                self.schedule_focus(FocusTarget::Scratchpad)
+            }
+        }
+    }
 
-                Task::batch(vec![
-                    self.focus_main_window(),
-                    self.focus_pending_target(),
-                    self.update_title(),
-                ])
+    fn handle_summon(&mut self, target: FocusTarget) -> Task<cosmic::Action<Message>> {
+        if self.main_window_is_focused() {
+            self.dismiss_surface()
+        } else {
+            match target {
+                FocusTarget::TodayNote => Task::batch(vec![
+                    self.handle_app_command(AppCommand::ShowSurface),
+                    self.handle_app_command(AppCommand::FocusTodayNote),
+                ]),
+                FocusTarget::Scratchpad => Task::batch(vec![
+                    self.handle_app_command(AppCommand::ShowSurface),
+                    self.handle_app_command(AppCommand::FocusScratchpad),
+                ]),
+                FocusTarget::None => Task::none(),
             }
         }
     }
@@ -598,6 +606,17 @@ impl AppModel {
 
         cosmic::iced_runtime::window::minimize(id, false)
             .chain(cosmic::iced_runtime::window::gain_focus(id))
+    }
+
+    fn schedule_focus(&mut self, target: FocusTarget) -> Task<cosmic::Action<Message>> {
+        self.pending_focus = target;
+
+        let mut tasks = vec![self.focus_main_window(), self.update_title()];
+        if self.main_window_is_focused() {
+            tasks.push(Task::done(cosmic::Action::App(Message::ApplyPendingFocus)));
+        }
+
+        Task::batch(tasks)
     }
 
     fn focus_pending_target(&mut self) -> Task<cosmic::Action<Message>> {
@@ -673,8 +692,12 @@ impl ShellMode {
         }
     }
 
-    fn is_dashboard(&self) -> bool {
+    fn hides_headerbar(&self) -> bool {
         matches!(self, Self::DashboardOnly | Self::Surface)
+    }
+
+    fn is_dashboard_only(&self) -> bool {
+        matches!(self, Self::DashboardOnly)
     }
 }
 

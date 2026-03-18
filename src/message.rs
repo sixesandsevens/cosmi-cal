@@ -33,6 +33,7 @@ pub enum Message {
     ClearClipboardHistory,
     Event(Event),
     AppCommand(AppCommand),
+    ApplyPendingFocus,
 
     // Persistence
     SaveTick,
