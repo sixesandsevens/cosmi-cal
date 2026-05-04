@@ -20,6 +20,13 @@ ICON_SOURCE="${REPO_ROOT}/resources/icons/hicolor/scalable/apps/icon.svg"
 ICON_TARGET="${ICON_THEME_ROOT}/256x256/apps/${APP_NAME}.png"
 ICON_SIZES="32x32 48x48 64x64 128x128 256x256 512x512"
 
+if ! command -v cargo >/dev/null 2>&1; then
+    printf '%s\n' "Cargo was not found. Install Rust/Cargo, then rerun this script." >&2
+    printf '%s\n' "On Pop!_OS/Ubuntu: sudo apt install cargo" >&2
+    printf '%s\n' "Or with rustup: https://rustup.rs" >&2
+    exit 1
+fi
+
 mkdir -p "$BIN_DIR" "$APP_DIR"
 
 printf '%s\n' "Building CosmiCal..."
@@ -29,7 +36,8 @@ printf '%s\n' "Installing binary to ${BIN_TARGET}..."
 install -m 0755 "$BIN_SOURCE" "$BIN_TARGET"
 
 printf '%s\n' "Installing desktop entry to ${DESKTOP_TARGET}..."
-install -m 0644 "$DESKTOP_SOURCE" "$DESKTOP_TARGET"
+sed "s|^Exec=.*|Exec=${BIN_TARGET}|" "$DESKTOP_SOURCE" > "$DESKTOP_TARGET"
+chmod 0644 "$DESKTOP_TARGET"
 
 ICON_INSTALLED=0
 

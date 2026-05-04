@@ -2,9 +2,10 @@
 Name=CosmiCal
 Comment=A minimal calendar, notes, and clipboard utility for the COSMIC desktop
 Type=Application
-Icon=cosmi-cal
+Icon=io.github.sixesandsevens.cosmical
 Exec=cosmi-cal
 Terminal=false
 StartupNotify=true
-Categories=Office;Utility;
+Categories=Utility;Calendar;Office;
 Keywords=calendar;notes;clipboard;COSMIC;Pop;
+StartupWMClass=cosmi-cal

@@ -9,6 +9,7 @@ mod i18n;
 mod ipc;
 mod message;
 mod model;
+mod platform;
 mod storage;
 mod ui;
 
@@ -17,6 +18,13 @@ fn main() -> cosmic::iced::Result {
     i18n::init(&requested_languages);
 
     let launch = LaunchPlan::from_args();
+    if launch.summon {
+        match platform::summon::handle_summon(launch.focus_scratchpad) {
+            platform::summon::SummonOutcome::Handled => return Ok(()),
+            platform::summon::SummonOutcome::ContinueStartup => {}
+        }
+    }
+
     let startup_commands = launch.startup_commands();
     match ipc::prepare_startup(&startup_commands) {
         Ok(ipc::StartupAction::ForwardedToPrimary) => return Ok(()),
@@ -84,6 +92,8 @@ fn main() -> cosmic::iced::Result {
 struct LaunchPlan {
     commands: Vec<commands::AppCommand>,
     shell_mode_env: Option<String>,
+    summon: bool,
+    focus_scratchpad: bool,
 }
 
 impl LaunchPlan {
@@ -113,8 +123,10 @@ impl LaunchPlan {
         }
 
         if summon {
+            plan.summon = true;
             plan.shell_mode_env = Some("surface".to_string());
             if focus_scratchpad {
+                plan.focus_scratchpad = true;
                 plan.commands.push(commands::AppCommand::SummonScratchpad);
             } else {
                 plan.commands.push(commands::AppCommand::SummonToggle);
@@ -125,6 +137,7 @@ impl LaunchPlan {
                 plan.commands.push(commands::AppCommand::FocusTodayNote);
             }
             if focus_scratchpad {
+                plan.focus_scratchpad = true;
                 plan.shell_mode_env = Some("surface".to_string());
                 plan.commands.push(commands::AppCommand::FocusScratchpad);
             }
@@ -151,11 +164,19 @@ mod tests {
     use crate::commands::AppCommand;
 
     #[test]
-    fn summon_scratchpad_uses_single_toggle_command() {
+    fn summon_scratchpad_uses_toggle_command() {
         let plan = launch_plan_from(["cosmi-cal", "--summon", "--focus-scratchpad"]);
 
         assert_eq!(plan.shell_mode_env.as_deref(), Some("surface"));
         assert_eq!(plan.commands, vec![AppCommand::SummonScratchpad]);
+    }
+
+    #[test]
+    fn summon_uses_toggle_command() {
+        let plan = launch_plan_from(["cosmi-cal", "--summon"]);
+
+        assert_eq!(plan.shell_mode_env.as_deref(), Some("surface"));
+        assert_eq!(plan.commands, vec![AppCommand::SummonToggle]);
     }
 
     #[test]

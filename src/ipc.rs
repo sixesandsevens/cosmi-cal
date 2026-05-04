@@ -35,6 +35,11 @@ pub fn prepare_startup(commands: &[AppCommand]) -> Result<StartupAction, String>
     prepare_startup_at_path(&path, commands)
 }
 
+pub fn forward_commands(commands: &[AppCommand]) -> Result<(), String> {
+    let path = socket_path();
+    forward_commands_at_path(&path, commands)
+}
+
 fn prepare_startup_at_path(path: &Path, commands: &[AppCommand]) -> Result<StartupAction, String> {
     if !path.exists() {
         return Ok(StartupAction::StartPrimary);
@@ -42,9 +47,7 @@ fn prepare_startup_at_path(path: &Path, commands: &[AppCommand]) -> Result<Start
 
     match StdUnixStream::connect(&path) {
         Ok(mut stream) => {
-            for command in commands {
-                writeln!(stream, "{}", command.as_wire()).map_err(|e| e.to_string())?;
-            }
+            write_commands(&mut stream, commands)?;
             Ok(StartupAction::ForwardedToPrimary)
         }
         Err(err) => {
@@ -57,6 +60,18 @@ fn prepare_startup_at_path(path: &Path, commands: &[AppCommand]) -> Result<Start
             Ok(StartupAction::StartPrimary)
         }
     }
+}
+
+fn forward_commands_at_path(path: &Path, commands: &[AppCommand]) -> Result<(), String> {
+    let mut stream = StdUnixStream::connect(path).map_err(|e| e.to_string())?;
+    write_commands(&mut stream, commands)
+}
+
+fn write_commands(stream: &mut StdUnixStream, commands: &[AppCommand]) -> Result<(), String> {
+    for command in commands {
+        writeln!(stream, "{}", command.as_wire()).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 pub fn subscription() -> Subscription<AppCommand> {
@@ -196,6 +211,26 @@ mod tests {
             !path.exists(),
             "stale socket file should be removed before primary startup"
         );
+
+        cleanup_test_socket(&path);
+    }
+
+    #[test]
+    fn forward_commands_writes_to_live_socket() {
+        let path = unique_test_socket_path("forward");
+        let listener = StdUnixListener::bind(&path).expect("bind forward socket");
+
+        forward_commands_at_path(&path, &[AppCommand::ShowSurface, AppCommand::FocusScratchpad])
+            .expect("forward commands");
+
+        let (mut stream, _) = listener.accept().expect("accept forwarded connection");
+        let mut text = String::new();
+        use std::io::Read;
+        stream
+            .read_to_string(&mut text)
+            .expect("read forwarded commands");
+
+        assert_eq!(text, "show_surface\nfocus_scratchpad\n");
 
         cleanup_test_socket(&path);
     }

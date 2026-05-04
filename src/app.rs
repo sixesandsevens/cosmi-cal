@@ -58,6 +58,7 @@ pub struct AppModel {
     pub day_note_editor_id: widget::Id,
     pub scratchpad_editor_id: widget::Id,
     pending_focus: FocusTarget,
+    main_window_focused: bool,
 }
 
 #[derive(Clone, Default)]
@@ -189,6 +190,7 @@ impl cosmic::Application for AppModel {
             day_note_editor_id: widget::Id::unique(),
             scratchpad_editor_id: widget::Id::unique(),
             pending_focus: FocusTarget::None,
+            main_window_focused: false,
         };
 
         let mut commands = vec![app.update_title()];
@@ -437,9 +439,14 @@ impl cosmic::Application for AppModel {
             }
 
             Message::Event(Event::Window(window::Event::Focused)) => {
+                self.main_window_focused = true;
                 if self.pending_focus != FocusTarget::None {
                     return self.focus_pending_target();
                 }
+            }
+
+            Message::Event(Event::Window(window::Event::Unfocused)) => {
+                self.main_window_focused = false;
             }
 
             Message::Event(_) => {}
@@ -592,11 +599,12 @@ impl AppModel {
             return Task::none();
         };
 
-        window::close(id)
+        self.main_window_focused = false;
+        cosmic::iced_runtime::window::minimize(id, true)
     }
 
     fn main_window_is_focused(&self) -> bool {
-        self.core.focused_window() == self.core.main_window_id()
+        self.main_window_focused
     }
 
     fn focus_main_window(&self) -> Task<cosmic::Action<Message>> {
