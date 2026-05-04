@@ -8,27 +8,35 @@ use std::process::Command;
 const WINDOW_CLASSES: &[&str] = &["cosmi-cal", "io.github.sixesandsevens.cosmical"];
 
 pub fn summon(focus_scratchpad: bool) -> SummonOutcome {
-    if !is_running_window_present() {
+    let Some(window_id) = running_window_id() else {
+        return SummonOutcome::ContinueStartup;
+    };
+
+    if is_cosmical_focused() {
+        if minimize_active_window() || forward_toggle_command(focus_scratchpad) {
+            return SummonOutcome::Handled;
+        }
+
         return SummonOutcome::ContinueStartup;
     }
 
-    if is_cosmical_focused() {
-        minimize_active_window();
-        return SummonOutcome::Handled;
+    let focused = focus_window(&window_id);
+    let forwarded = forward_show_commands(focus_scratchpad);
+    if focused || forwarded {
+        SummonOutcome::Handled
+    } else {
+        SummonOutcome::ContinueStartup
     }
-
-    focus_existing_window();
-    forward_show_commands(focus_scratchpad);
-    SummonOutcome::Handled
 }
 
-fn is_running_window_present() -> bool {
+fn running_window_id() -> Option<String> {
     let Ok(out) = Command::new("wmctrl").args(["-lx"]).output() else {
-        return false;
+        return None;
     };
 
-    let text = String::from_utf8_lossy(&out.stdout).to_lowercase();
-    WINDOW_CLASSES.iter().any(|class| text.contains(*class))
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .find_map(matching_window_id)
 }
 
 fn is_cosmical_focused() -> bool {
@@ -45,25 +53,34 @@ fn is_cosmical_focused() -> bool {
         .any(|needle| class.trim().eq_ignore_ascii_case(needle))
 }
 
-fn focus_existing_window() {
-    for class in WINDOW_CLASSES {
-        if Command::new("wmctrl")
-            .args(["-x", "-a", *class])
-            .status()
-            .is_ok_and(|status| status.success())
-        {
-            return;
-        }
-    }
+fn matching_window_id(line: &str) -> Option<String> {
+    let mut fields = line.split_whitespace();
+    let window_id = fields.next()?;
+    let _desktop = fields.next()?;
+    let _host = fields.next()?;
+    let class = fields.next()?.to_lowercase();
+
+    WINDOW_CLASSES
+        .iter()
+        .any(|needle| class.contains(needle))
+        .then(|| window_id.to_string())
 }
 
-fn minimize_active_window() {
-    let _ = Command::new("xdotool")
+fn focus_window(window_id: &str) -> bool {
+    Command::new("wmctrl")
+        .args(["-ia", window_id])
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+fn minimize_active_window() -> bool {
+    Command::new("xdotool")
         .args(["getactivewindow", "windowminimize"])
-        .status();
+        .status()
+        .is_ok_and(|status| status.success())
 }
 
-fn forward_show_commands(focus_scratchpad: bool) {
+fn forward_show_commands(focus_scratchpad: bool) -> bool {
     let mut commands = vec![AppCommand::ShowSurface];
     if focus_scratchpad {
         commands.push(AppCommand::FocusScratchpad);
@@ -73,5 +90,49 @@ fn forward_show_commands(focus_scratchpad: bool) {
 
     if let Err(err) = ipc::forward_commands(&commands) {
         eprintln!("failed to forward summon command to CosmiCal: {err}");
+        false
+    } else {
+        true
+    }
+}
+
+fn forward_toggle_command(focus_scratchpad: bool) -> bool {
+    let command = if focus_scratchpad {
+        AppCommand::SummonScratchpad
+    } else {
+        AppCommand::SummonToggle
+    };
+
+    if let Err(err) = ipc::forward_commands(&[command]) {
+        eprintln!("failed to forward summon command to CosmiCal: {err}");
+        false
+    } else {
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::matching_window_id;
+
+    #[test]
+    fn matches_packaged_window_class_from_wmctrl() {
+        let line = "0x03a00003  0 host io.github.sixesandsevens.cosmical.CosmiCal CosmiCal";
+
+        assert_eq!(matching_window_id(line).as_deref(), Some("0x03a00003"));
+    }
+
+    #[test]
+    fn matches_development_window_class_from_wmctrl() {
+        let line = "0x03a00003  0 host cosmi-cal.cosmi-cal CosmiCal";
+
+        assert_eq!(matching_window_id(line).as_deref(), Some("0x03a00003"));
+    }
+
+    #[test]
+    fn ignores_title_only_matches_from_wmctrl() {
+        let line = "0x03a00003  0 host org.example.Other io.github.sixesandsevens.cosmical";
+
+        assert_eq!(matching_window_id(line), None);
     }
 }
